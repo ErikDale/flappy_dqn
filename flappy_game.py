@@ -99,7 +99,6 @@ class flappyGame:
         # list of lowerpipe
         self.lowerPipes = []
 
-
     def main(self):
         pygame.init()
         pygame.display.set_caption('Flappy Bird')
@@ -137,43 +136,76 @@ class flappyGame:
         SOUNDS['swoosh'] = pygame.mixer.Sound('assets/audio/swoosh' + soundExt)
         SOUNDS['wing'] = pygame.mixer.Sound('assets/audio/wing' + soundExt)
 
-        while True:
-            # select random background sprites
-            randBg = random.randint(0, len(BACKGROUNDS_LIST) - 1)
-            IMAGES['background'] = pygame.image.load(BACKGROUNDS_LIST[randBg]).convert()
+        # select random background sprites
+        randBg = random.randint(0, len(BACKGROUNDS_LIST) - 1)
+        IMAGES['background'] = pygame.image.load(BACKGROUNDS_LIST[randBg]).convert()
 
-            # select random player sprites
-            randPlayer = random.randint(0, len(PLAYERS_LIST) - 1)
-            IMAGES['player'] = (
-                pygame.image.load(PLAYERS_LIST[randPlayer][0]).convert_alpha(),
-                pygame.image.load(PLAYERS_LIST[randPlayer][1]).convert_alpha(),
-                pygame.image.load(PLAYERS_LIST[randPlayer][2]).convert_alpha(),
-            )
+        # select random player sprites
+        randPlayer = random.randint(0, len(PLAYERS_LIST) - 1)
+        IMAGES['player'] = (
+            pygame.image.load(PLAYERS_LIST[randPlayer][0]).convert_alpha(),
+            pygame.image.load(PLAYERS_LIST[randPlayer][1]).convert_alpha(),
+            pygame.image.load(PLAYERS_LIST[randPlayer][2]).convert_alpha(),
+        )
 
-            # select random pipe sprites
-            pipeindex = random.randint(0, len(PIPES_LIST) - 1)
-            IMAGES['pipe'] = (
-                pygame.transform.flip(
-                    pygame.image.load(PIPES_LIST[pipeindex]).convert_alpha(), False, True),
-                pygame.image.load(PIPES_LIST[pipeindex]).convert_alpha(),
-            )
+        # select random pipe sprites
+        pipeindex = random.randint(0, len(PIPES_LIST) - 1)
+        IMAGES['pipe'] = (
+            pygame.transform.flip(
+                pygame.image.load(PIPES_LIST[pipeindex]).convert_alpha(), False, True),
+            pygame.image.load(PIPES_LIST[pipeindex]).convert_alpha(),
+        )
 
-            # hitmask for pipes
-            HITMASKS['pipe'] = (
-                self.getHitmask(IMAGES['pipe'][0]),
-                self.getHitmask(IMAGES['pipe'][1]),
-            )
+        # hitmask for pipes
+        HITMASKS['pipe'] = (
+            self.getHitmask(IMAGES['pipe'][0]),
+            self.getHitmask(IMAGES['pipe'][1]),
+        )
 
-            # hitmask for player
-            HITMASKS['player'] = (
-                self.getHitmask(IMAGES['player'][0]),
-                self.getHitmask(IMAGES['player'][1]),
-                self.getHitmask(IMAGES['player'][2]),
-            )
+        # hitmask for player
+        HITMASKS['player'] = (
+            self.getHitmask(IMAGES['player'][0]),
+            self.getHitmask(IMAGES['player'][1]),
+            self.getHitmask(IMAGES['player'][2]),
+        )
 
-            self.movementInfo = self.showWelcomeAnimation()
-            crashInfo = self.mainGame()
-            self.showGameOverScreen(crashInfo)
+        # self.movementInfo = self.showWelcomeAnimation()
+
+        # Initial position
+        playery = int((SCREENHEIGHT - IMAGES['player'][0].get_height()) / 2)
+        # player shm for up-down motion on welcome screen
+        playerShmVals = {'val': 0, 'dir': 1}
+        basex = 0
+
+        playerIndexGen = cycle([0, 1, 2, 1])
+
+        self.movementInfo = {
+            'playery': playery + playerShmVals['val'],
+            'basex': basex,
+            'playerIndexGen': playerIndexGen,
+        }
+
+        self.playerIndexGen = self.movementInfo['playerIndexGen']
+        self.playerx, self.playery = int(SCREENWIDTH * 0.2), self.movementInfo['playery']
+
+        self.basex = self.movementInfo['basex']
+        self.baseShift = IMAGES['base'].get_width() - IMAGES['background'].get_width()
+
+        # get 2 new pipes to add to upperPipes lowerPipes list
+        self.newPipe1 = self.getRandomPipe()
+        self.newPipe2 = self.getRandomPipe()
+
+        # list of upper pipes
+        self.upperPipes = [
+            {'x': SCREENWIDTH + 200, 'y': self.newPipe1[0]['y']},
+            {'x': SCREENWIDTH + 200 + (SCREENWIDTH / 2), 'y': self.newPipe2[0]['y']},
+        ]
+
+        # list of lowerpipe
+        self.lowerPipes = [
+            {'x': SCREENWIDTH + 200, 'y': self.newPipe1[1]['y']},
+            {'x': SCREENWIDTH + 200 + (SCREENWIDTH / 2), 'y': self.newPipe2[1]['y']},
+        ]
 
     def showWelcomeAnimation(self):
         """Shows welcome screen animation of flappy bird"""
@@ -228,6 +260,7 @@ class flappyGame:
             self.fpsClock.tick(FPS)
 
     def takeStep(self):
+        reward = 0
         for event in pygame.event.get():
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
                 pygame.quit()
@@ -245,6 +278,7 @@ class flappyGame:
 
         # If crash, break out of game loop
         if crashTest[0]:
+            reward = -5
             return {
                 'y': self.playery,
                 'groundCrash': crashTest[1],
@@ -253,7 +287,9 @@ class flappyGame:
                 'lowerPipes': self.lowerPipes,
                 'score': self.score,
                 'playerVelY': self.playerVelY,
-                'playerRot': self.playerRot
+                'playerRot': self.playerRot,
+                'state': pygame.surfarray.array3d(self.screen),
+                'reward': reward,
             }
 
         # check for score
@@ -261,8 +297,11 @@ class flappyGame:
         for pipe in self.upperPipes:
             pipeMidPos = pipe['x'] + IMAGES['pipe'][0].get_width() / 2
             if pipeMidPos <= playerMidPos < pipeMidPos + 4:
+                reward = 5
                 self.score += 1
                 SOUNDS['point'].play()
+            else:
+                reward = 1
 
         # playerIndex basex change
         if (self.loopIter + 1) % 3 == 0:
@@ -324,34 +363,26 @@ class flappyGame:
         pygame.display.update()
         self.fpsClock.tick(FPS)
 
-    def mainGame(self):
-        self.playerIndexGen = self.movementInfo['playerIndexGen']
-        self.playerx, self.playery = int(SCREENWIDTH * 0.2), self.movementInfo['playery']
+        return {
+                'y': self.playery,
+                'groundCrash': crashTest[1],
+                'basex': self.basex,
+                'upperPipes': self.upperPipes,
+                'lowerPipes': self.lowerPipes,
+                'score': self.score,
+                'playerVelY': self.playerVelY,
+                'playerRot': self.playerRot,
+                'state': pygame.surfarray.array3d(self.screen),
+                'rewards': reward
+            }
 
-        self.basex = self.movementInfo['basex']
-        self.baseShift = IMAGES['base'].get_width() - IMAGES['background'].get_width()
-
-        # get 2 new pipes to add to upperPipes lowerPipes list
-        self.newPipe1 = self.getRandomPipe()
-        self.newPipe2 = self.getRandomPipe()
-
-        # list of upper pipes
-        self.upperPipes = [
-            {'x': SCREENWIDTH + 200, 'y': self.newPipe1[0]['y']},
-            {'x': SCREENWIDTH + 200 + (SCREENWIDTH / 2), 'y': self.newPipe2[0]['y']},
-        ]
-
-        # list of lowerpipe
-        self.lowerPipes = [
-            {'x': SCREENWIDTH + 200, 'y': self.newPipe1[1]['y']},
-            {'x': SCREENWIDTH + 200 + (SCREENWIDTH / 2), 'y': self.newPipe2[1]['y']},
-        ]
+    '''def mainGame(self):       
 
         # Gameloop
         while True:
             crash_info = self.takeStep()
             if crash_info:
-                return crash_info
+                return crash_info'''
 
     def showGameOverScreen(self, crashInfo):
         """crashes the player down and shows gameover image"""
@@ -513,3 +544,11 @@ class flappyGame:
 if __name__ == '__main__':
     flappyGame = flappyGame()
     flappyGame.main()
+
+    # crash_info = None
+    while True:
+        crash_info = flappyGame.takeStep()
+        if crash_info:
+            break
+
+    flappyGame.showGameOverScreen(crash_info)
