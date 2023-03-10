@@ -1,10 +1,10 @@
 import tensorflow as tf
 import numpy as np
-from tensorflow.keras import Model
+from tensorflow import keras
 import tensorflow_probability as tfp
 
 
-class MakeModel(Model):
+class CNNRLModel(keras.Model):
     def __init__(self, num_actions):
         super().__init__()
         self.cnn1 = tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(288, 512, 3))
