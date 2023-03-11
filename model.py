@@ -16,7 +16,10 @@ class CNNRLModel(keras.Model):
         self.action = tf.keras.layers.Dense(num_actions, activation='softmax')
 
     def call(self, state):
-        x = tf.convert_to_tensor(state)
+        state = tf.convert_to_tensor(state)
+        if len(state.shape) < 4:
+            state = tf.expand_dims(state, 0)
+        x = tf.cast(state, tf.float32)
         x = self.cnn1(x)
         x = self.max1(x)
         x = self.cnn2(x)

@@ -45,7 +45,7 @@ class Agent:
 
         for state, action, reward in zip(self.state_memory, self.action_memory, discnt_rewards):
             with tf.GradientTape() as tape:
-                p = self.model(np.array([state]), training=True)
+                p = self.model(np.array(state), training=True)
                 loss = self.calc_loss(p, action, reward)
                 grads = tape.gradient(loss, self.model.trainable_variables)
                 self.opt.apply_gradients(zip(grads, self.model.trainable_variables))
@@ -55,6 +55,10 @@ class Agent:
         self.state_memory = []
 
     def calc_loss(self, prob, action, reward):
+        print(prob)
+        print(action)
+        reward = tf.convert_to_tensor(reward)
+        print(reward)
         dist = tfp.distributions.Categorical(probs=prob, dtype=tf.float32)
         log_prob = dist.log_prob(action)
         loss = -log_prob * reward

@@ -261,14 +261,15 @@ class flappyGame:
             pygame.display.update()
             self.fpsClock.tick(FPS)
 
-    def takeStep(self):
+    def takeStep(self, action):
+        print(action)
         reward = 0
         for event in pygame.event.get():
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
                 pygame.quit()
                 sys.exit()
             # Player presses flap button (space or up key)
-            if event.type == KEYDOWN and (event.key == K_SPACE or event.key == K_UP):
+            if action == 1:
                 if self.playery > -2 * IMAGES['player'][0].get_height():
                     self.playerVelY = self.playerFlapAcc
                     self.playerFlapped = True
@@ -376,7 +377,7 @@ class flappyGame:
                 'playerVelY': self.playerVelY,
                 'playerRot': self.playerRot,
                 'state': pygame.surfarray.array3d(self.screen),
-                'rewards': reward,
+                'reward': reward,
                 'done': False
             }
 
@@ -545,7 +546,7 @@ class flappyGame:
         return mask
 
 
-if __name__ == '__main__':
+'''if __name__ == '__main__':
     flappyGame = flappyGame()
     flappyGame.main()
 
@@ -555,4 +556,4 @@ if __name__ == '__main__':
         if crash_info:
             break
 
-    flappyGame.showGameOverScreen(crash_info)
+    flappyGame.showGameOverScreen(crash_info)'''
