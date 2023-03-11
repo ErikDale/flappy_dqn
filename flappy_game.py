@@ -207,6 +207,8 @@ class flappyGame:
             {'x': SCREENWIDTH + 200 + (SCREENWIDTH / 2), 'y': self.newPipe2[1]['y']},
         ]
 
+        return pygame.surfarray.array3d(self.screen)
+
     def showWelcomeAnimation(self):
         """Shows welcome screen animation of flappy bird"""
         # index of player to blit on screen
@@ -290,6 +292,7 @@ class flappyGame:
                 'playerRot': self.playerRot,
                 'state': pygame.surfarray.array3d(self.screen),
                 'reward': reward,
+                'done': True
             }
 
         # check for score
@@ -373,7 +376,8 @@ class flappyGame:
                 'playerVelY': self.playerVelY,
                 'playerRot': self.playerRot,
                 'state': pygame.surfarray.array3d(self.screen),
-                'rewards': reward
+                'rewards': reward,
+                'done': False
             }
 
     '''def mainGame(self):       

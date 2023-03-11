@@ -14,7 +14,7 @@ class Agent:
         self.state_memory = []
 
     def choose_action(self, state):
-        prob = self.model([state])
+        prob = self.model(state)
         dist = tfp.distributions.Categorical(probs=prob, dtype=tf.float32)
         action = dist.sample()
         self.action_memory.append(action)
