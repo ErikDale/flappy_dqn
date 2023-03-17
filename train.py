@@ -56,7 +56,7 @@ for i in range(num_episodes):
         state = state_
         score += state_reward_struct['reward']
 
-        # env.render()
+
         done = state_reward_struct['done']
         if done:
             scores.append(score)
