@@ -19,12 +19,15 @@ class Agent:
         action = dist.sample()
         self.action_memory.append(action)
         return int(action.numpy()[0])
-
+ 
     def store_reward(self, reward):
         self.reward_memory.append(reward)
 
     def store_state(self, state):
         self.state_memory.append(state)
+
+    def store_action(self, action):
+        self.action_memory.append(action)
 
     def learn(self):
         # G = np.zeros_like(self.reward_memory)
@@ -55,11 +58,9 @@ class Agent:
         self.state_memory = []
 
     def calc_loss(self, prob, action, reward):
-        print(prob)
-        print(action)
-        reward = tf.convert_to_tensor(reward)
-        print(reward)
-        dist = tfp.distributions.Categorical(probs=prob, dtype=tf.float32)
+        reward = tf.convert_to_tensor(reward, 1)
+        # Add a small value to prob to avoid getting nan or inf
+        dist = tfp.distributions.Categorical(probs=prob + 1e-8, dtype=tf.float32)
         log_prob = dist.log_prob(action)
         loss = -log_prob * reward
         return loss

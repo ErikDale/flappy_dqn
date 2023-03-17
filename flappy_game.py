@@ -207,6 +207,14 @@ class flappyGame:
             {'x': SCREENWIDTH + 200 + (SCREENWIDTH / 2), 'y': self.newPipe2[1]['y']},
         ]
 
+        # draw sprites
+        self.screen.blit(IMAGES['background'], (0, 0))
+        self.screen.blit(IMAGES['player'][self.playerIndex],
+                         (self.playerx, self.playery + playerShmVals['val']))
+        self.screen.blit(IMAGES['base'], (basex, BASEY))
+
+        pygame.display.update()
+
         return pygame.surfarray.array3d(self.screen)
 
     def showWelcomeAnimation(self):
@@ -263,7 +271,7 @@ class flappyGame:
 
     def takeStep(self, action):
         print(action)
-        reward = 0
+        reward = 1
         for event in pygame.event.get():
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
                 pygame.quit()
@@ -293,6 +301,7 @@ class flappyGame:
                 'playerRot': self.playerRot,
                 'state': pygame.surfarray.array3d(self.screen),
                 'reward': reward,
+                'action': action,
                 'done': True
             }
 
@@ -304,8 +313,6 @@ class flappyGame:
                 reward = 5
                 self.score += 1
                 SOUNDS['point'].play()
-            else:
-                reward = 1
 
         # playerIndex basex change
         if (self.loopIter + 1) % 3 == 0:
@@ -378,6 +385,7 @@ class flappyGame:
                 'playerRot': self.playerRot,
                 'state': pygame.surfarray.array3d(self.screen),
                 'reward': reward,
+                'action': action,
                 'done': False
             }
 
