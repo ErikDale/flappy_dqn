@@ -4,6 +4,7 @@ import sys
 import pygame
 from pygame.locals import *
 from PIL import Image
+from pre_processing import pre_process
 
 '''
 img = pygame.surfarray.array3d(self.screen)
@@ -46,8 +47,8 @@ PLAYERS_LIST = (
 
 # list of backgrounds
 BACKGROUNDS_LIST = (
-    'assets/sprites/background-day.png',
-    'assets/sprites/background-night.png',
+    'assets/sprites/background-day_black.png',
+    'assets/sprites/background-night_black.png',
 )
 
 # list of pipes
@@ -215,7 +216,7 @@ class flappyGame:
 
         pygame.display.update()
 
-        return pygame.surfarray.array3d(self.screen)
+        return pre_process(pygame.surfarray.array3d(self.screen))
 
     def showWelcomeAnimation(self):
         """Shows welcome screen animation of flappy bird"""
@@ -301,7 +302,6 @@ class flappyGame:
                 'playerRot': self.playerRot,
                 'state': pygame.surfarray.array3d(self.screen),
                 'reward': reward,
-                'action': action,
                 'done': True
             }
 
@@ -385,7 +385,6 @@ class flappyGame:
                 'playerRot': self.playerRot,
                 'state': pygame.surfarray.array3d(self.screen),
                 'reward': reward,
-                'action': action,
                 'done': False
             }
 

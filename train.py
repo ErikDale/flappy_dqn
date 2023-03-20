@@ -3,6 +3,7 @@ from flappy_game import flappyGame
 import tensorflow as tf
 import random
 import matplotlib.pyplot as plt
+from pre_processing import pre_process
 
 
 def plotGraph(x, y, title, x_label, y_label):
@@ -45,11 +46,11 @@ for i in range(num_episodes):
             agent.store_action(tf.convert_to_tensor(action, 1))
 
         state_reward_struct = flappyGameObj.takeStep(action)
-        print(state_reward_struct)
 
-        # state_,reward,done,_ = env.step(action)
-        # Perform normalization on the image
-        state_ = tf.image.per_image_standardization(state_reward_struct['state'])
+        # Perform pre-processing on the image
+        image = pre_process(state_reward_struct['state'])
+
+        state_ = image
 
         agent.store_reward(state_reward_struct['reward'])
         agent.store_state(state_)
