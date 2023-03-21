@@ -1,8 +1,15 @@
 import tensorflow as tf
 from tensorflow import keras
 
+"""
+@author: Erik Dale
+@date: 21.03.23
+"""
 
 class CNNRLModel(keras.Model):
+    """
+    Convolutional Neural Network model. It takes the number of actions as input
+    """
     def __init__(self, num_actions):
         super().__init__()
         self.cnn1 = tf.keras.layers.Conv2D(32, kernel_size=8, strides=4, activation='relu', input_shape=(288, 512, 1))

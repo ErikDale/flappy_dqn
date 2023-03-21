@@ -4,6 +4,7 @@ import tensorflow as tf
 import random
 import matplotlib.pyplot as plt
 from pre_processing import pre_process
+from PIL import Image
 
 
 def plotGraph(x, y, title, x_label, y_label):
@@ -24,11 +25,12 @@ exploration = 1.0
 exploration_decay = 0.05
 
 agent = Agent()
-num_episodes = 10
+num_episodes = 100
 
 scores = []
 
 for i in range(num_episodes):
+    # Initialize the environment (game)
     flappyGameObj = flappyGame()
     state = flappyGameObj.main()
     score = 0
@@ -56,7 +58,6 @@ for i in range(num_episodes):
         agent.store_state(state_)
         state = state_
         score += state_reward_struct['reward']
-
 
         done = state_reward_struct['done']
         if done:
