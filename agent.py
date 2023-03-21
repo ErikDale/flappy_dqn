@@ -3,8 +3,13 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 import numpy as np
 
+"""
+@author: Erik Dale
+@date: 21.03.23
+"""
+
 class Agent:
-    def __init__(self, gamma=0.95, lr=0.001, n_actions=2):
+    def __init__(self, gamma=0.95, lr=0.005, n_actions=2):
         self.gamma = gamma
         self.lr = lr
         self.model = CNNRLModel(n_actions)
@@ -14,6 +19,11 @@ class Agent:
         self.state_memory = []
 
     def choose_action(self, state):
+        """
+        Method that gives a state to the model, and then gets an action in return from the model
+        :param state: state of the game
+        :return: an action calculated by the model given a state
+        """
         prob = self.model(state)
         dist = tfp.distributions.Categorical(probs=prob, dtype=tf.float32)
         action = dist.sample()
@@ -30,14 +40,6 @@ class Agent:
         self.action_memory.append(action)
 
     def learn(self):
-        # G = np.zeros_like(self.reward_memory)
-        # for i in range(len(self.reward_memory)):
-        #     discount = 1
-        #     g_sum = 0
-        #     for j in range(i,len(self.reward_memory)):
-        #         g_sum += self.reward_memory[j] * discount
-        #         discount *= self.gamma
-        #     G[i] = g_sum
         sum_reward = 0
         discnt_rewards = []
         self.reward_memory.reverse()
@@ -57,10 +59,18 @@ class Agent:
         self.action_memory = []
         self.state_memory = []
 
-    def calc_loss(self, prob, action, reward):
+    '''def calc_loss(self, prob, action, reward):
         reward = tf.convert_to_tensor(reward, 1)
         # Add a small value to prob to avoid getting nan or inf
         dist = tfp.distributions.Categorical(probs=prob + 1e-8, dtype=tf.float32)
         log_prob = dist.log_prob(action)
         loss = -log_prob * reward
+        return loss'''
+
+    def calc_loss(self, prob, action, reward):
+        reward = tf.convert_to_tensor(reward, 1)
+        # Add a small value to prob to avoid getting nan or inf
+        dist = tfp.distributions.Categorical(probs=prob + 1e-8, dtype=tf.float32)
+        prob_action = dist.probs_parameter()[0][int(action)]
+        loss = -tf.math.log(prob_action) * reward
         return loss
