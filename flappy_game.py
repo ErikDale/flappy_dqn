@@ -15,7 +15,7 @@ image.save('./image.png')
 FPS = 30
 SCREENWIDTH = 288
 SCREENHEIGHT = 512
-PIPEGAPSIZE = 100  # gap between upper and lower part of pipe
+PIPEGAPSIZE = 200  # gap between upper and lower part of pipe
 BASEY = SCREENHEIGHT * 0.79
 # image, sound and hitmask  dicts
 IMAGES, SOUNDS, HITMASKS = {}, {}, {}
@@ -96,6 +96,7 @@ class flappyGame:
         self.lowerPipes = []
 
     def main(self):
+        self.score = 0
         pygame.init()
         pygame.display.set_caption('Flappy Bird')
 
@@ -305,6 +306,8 @@ class flappyGame:
                 self.playerVelY = self.playerFlapAcc
                 self.playerFlapped = True
                 SOUNDS['wing'].play()
+                # If the player is outside the screen give less reward
+                reward = 1
 
         # check for crash here
         crashTest = self.checkCrash({'x': self.playerx, 'y': self.playery, 'index': self.playerIndex},
@@ -312,7 +315,7 @@ class flappyGame:
 
         # If crash, break out of game loop
         if crashTest[0]:
-            reward = -5
+            reward = -40
             return {
                 'y': self.playery,
                 'groundCrash': crashTest[1],
@@ -332,7 +335,7 @@ class flappyGame:
         for pipe in self.upperPipes:
             pipeMidPos = pipe['x'] + IMAGES['pipe'][0].get_width() / 2
             if pipeMidPos <= playerMidPos < pipeMidPos + 4:
-                reward = 5
+                reward = 40
                 self.score += 1
                 SOUNDS['point'].play()
 

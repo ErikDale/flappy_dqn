@@ -21,9 +21,16 @@ def plotGraph(x, y, title, x_label, y_label):
 
 
 exploration = 1.0
-exploration_decay = 0.05
+exploration_decay = 0.001
 
 num_episodes = 500
+
+
+def random_output():
+    if random.random() < 0.9:
+        return 0
+    else:
+        return 1
 
 def train_cnnq_model(exploration):
     agent = Agent(cnn_model=True)
@@ -40,7 +47,7 @@ def train_cnnq_model(exploration):
             if random_float > exploration:
                 action = agent.choose_action(state)
             else:
-                action = random.randint(0, 1)
+                action = random_output()
                 agent.store_action(tf.convert_to_tensor(action, 1))
 
             state_reward_struct = flappyGameObj.takeStep(action)
@@ -80,7 +87,7 @@ def train_dnnq_model(exploration):
             if random_float > exploration:
                 action = agent.choose_action(state)
             else:
-                action = random.randint(0, 1)
+                action = random_output()
                 agent.store_action(tf.convert_to_tensor(action, 1))
 
             state_reward_struct = flappyGameObj.takeStep(action)

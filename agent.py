@@ -9,7 +9,7 @@ import numpy as np
 """
 
 class Agent:
-    def __init__(self, gamma=0.95, lr=0.005, n_actions=2, cnn_model=True):
+    def __init__(self, gamma=0.80, lr=0.001, n_actions=2, cnn_model=True):
         self.gamma = gamma
         self.lr = lr
         if cnn_model :

@@ -36,8 +36,9 @@ class CNNRLModel(keras.Model):
 class DNNModel(keras.Model):
     def __init__(self, num_actions):
         super().__init__()
-        self.fc1 = tf.keras.layers.Dense(64, activation='relu', input_shape=(13,))
-        self.fc2 = tf.keras.layers.Dense(32, activation='relu')
+        self.fc1 = tf.keras.layers.Dense(128, activation='relu', input_shape=(13,))
+        self.fc2 = tf.keras.layers.Dense(64, activation='relu')
+        self.fc3 = tf.keras.layers.Dense(32, activation='relu')
         self.action = tf.keras.layers.Dense(num_actions, activation='sigmoid')
 
     def call(self, state):
@@ -46,6 +47,7 @@ class DNNModel(keras.Model):
         #    state = tf.expand_dims(state, 0)
         x = self.fc1(state)
         x = self.fc2(x)
+        x = self.fc3(x)
         x = self.action(x)
         return x
 
