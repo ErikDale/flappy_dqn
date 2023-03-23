@@ -26,17 +26,17 @@ IMAGES, SOUNDS, HITMASKS = {}, {}, {}
 # list of all possible players (tuple of 3 positions of flap)
 PLAYERS_LIST = (
     # red bird
-    (
-        'assets/sprites/redbird-upflap.png',
-        'assets/sprites/redbird-midflap.png',
-        'assets/sprites/redbird-downflap.png',
-    ),
+    #(
+    #    'assets/sprites/redbird-upflap.png',
+    #    'assets/sprites/redbird-midflap.png',
+    #    'assets/sprites/redbird-downflap.png',
+    #),
     # blue bird
-    (
-        'assets/sprites/bluebird-upflap.png',
-        'assets/sprites/bluebird-midflap.png',
-        'assets/sprites/bluebird-downflap.png',
-    ),
+    #(
+    #    'assets/sprites/bluebird-upflap.png',
+    #    'assets/sprites/bluebird-midflap.png',
+    #    'assets/sprites/bluebird-downflap.png',
+    #),
     # yellow bird
     (
         'assets/sprites/yellowbird-upflap.png',
@@ -48,7 +48,7 @@ PLAYERS_LIST = (
 # list of pipes
 PIPES_LIST = (
     'assets/sprites/pipe-green.png',
-    'assets/sprites/pipe-red.png',
+    #'assets/sprites/pipe-red.png',
 )
 
 try:
@@ -297,7 +297,7 @@ class flappyGame:
             self.fpsClock.tick(FPS)
 
     def takeStep(self, action):
-        print(action)
+        # print(action)
         reward = 1
         # Player presses flap button (space or up key)
         if action == 1:

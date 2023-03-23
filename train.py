@@ -23,16 +23,15 @@ def plotGraph(x, y, title, x_label, y_label):
 exploration = 1.0
 exploration_decay = 0.05
 
-num_episodes = 1000
+num_episodes = 500
 
 def train_cnnq_model(exploration):
     agent = Agent(cnn_model=True)
     # Maybe add exploration rate and exploration decay
     scores = []
-
+    flappyGameObj = flappyGame(cnn_model=True)
     for i in range(num_episodes):
         # Initialize the environment (game)
-        flappyGameObj = flappyGame(cnn_model=True)
         state = flappyGameObj.main()
         score = 0
         done = False
@@ -71,9 +70,8 @@ def train_dnnq_model(exploration):
     agent = Agent(cnn_model=False)
     # Maybe add exploration rate and exploration decay
     scores = []
-
+    flappyGameObj = flappyGame(cnn_model=False)
     for i in range(num_episodes):
-        flappyGameObj = flappyGame(cnn_model=False)
         state = flappyGameObj.main()
         score = 0
         done = False
@@ -109,5 +107,5 @@ def train_dnnq_model(exploration):
     plotGraph(x, scores, "Rewards over episodes", "Episode", "Score")
 
 
-# train_dnnq_model(exploration)
-train_cnnq_model(exploration)
+train_dnnq_model(exploration)
+#train_cnnq_model(exploration)
