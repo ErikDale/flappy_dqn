@@ -12,7 +12,7 @@ class Agent:
     def __init__(self, gamma=0.80, lr=0.001, n_actions=2, cnn_model=True):
         self.gamma = gamma
         self.lr = lr
-        if cnn_model :
+        if cnn_model:
             self.model = CNNRLModel(n_actions)
         else:
             self.model = DNNModel(n_actions)

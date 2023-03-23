@@ -5,6 +5,13 @@ import random
 import matplotlib.pyplot as plt
 from pre_processing import pre_process_cnn_input, pre_process_dnn_input
 from PIL import Image
+import pickle
+
+
+# Save agent's model parameters to disk
+def save_agent(agent, filename):
+    with open(filename, 'wb') as f:
+        pickle.dump(agent.model, f)
 
 
 def plotGraph(x, y, title, x_label, y_label):
@@ -23,7 +30,7 @@ def plotGraph(x, y, title, x_label, y_label):
 exploration = 1.0
 exploration_decay = 0.001
 
-num_episodes = 500
+num_episodes = 100
 
 
 def random_output():
@@ -112,7 +119,11 @@ def train_dnnq_model(exploration):
 
     x = list(range(1, len(scores) + 1))
     plotGraph(x, scores, "Rewards over episodes", "Episode", "Score")
+    # Saving agent's model
+    save_agent(agent, "./models/model1")
 
 
 train_dnnq_model(exploration)
+
+
 #train_cnnq_model(exploration)
