@@ -4,7 +4,7 @@ import sys
 import pygame
 from pygame.locals import *
 from PIL import Image
-from pre_processing import pre_process
+from pre_processing import pre_process_cnn_input, pre_process_dnn_input
 
 '''
 img = pygame.surfarray.array3d(self.screen)
@@ -45,12 +45,6 @@ PLAYERS_LIST = (
     ),
 )
 
-# list of backgrounds
-BACKGROUNDS_LIST = (
-    'assets/sprites/background-day_black.png',
-    'assets/sprites/background-night_black.png',
-)
-
 # list of pipes
 PIPES_LIST = (
     'assets/sprites/pipe-green.png',
@@ -64,7 +58,8 @@ except NameError:
 
 
 class flappyGame:
-    def __init__(self):
+    def __init__(self, cnn_model=True):
+        self.cnn_model = cnn_model
         self.screen = pygame.display.set_mode((SCREENWIDTH, SCREENHEIGHT))
         self.fpsClock = pygame.time.Clock()
 
@@ -103,6 +98,21 @@ class flappyGame:
     def main(self):
         pygame.init()
         pygame.display.set_caption('Flappy Bird')
+
+        # If it is a cnn model, use black background
+        if self.cnn_model:
+            # list of backgrounds
+            BACKGROUNDS_LIST = (
+                'assets/sprites/background-day_black.png',
+                'assets/sprites/background-night_black.png',
+            )
+        # If not, use normal background
+        else:
+            # list of backgrounds
+            BACKGROUNDS_LIST = (
+                'assets/sprites/background-day.png',
+                'assets/sprites/background-night.png',
+            )
 
         # numbers sprites for score display
         IMAGES['numbers'] = (
@@ -216,7 +226,23 @@ class flappyGame:
 
         pygame.display.update()
 
-        return pre_process(pygame.surfarray.array3d(self.screen))
+        if self.cnn_model:
+            return pre_process_cnn_input(pygame.surfarray.array3d(self.screen))
+        else:
+            return pre_process_dnn_input({
+                'y': self.playery,
+                'groundCrash': False,
+                'basex': self.basex,
+                'upperPipes': self.upperPipes,
+                'lowerPipes': self.lowerPipes,
+                'score': self.score,
+                'playerVelY': self.playerVelY,
+                'playerRot': self.playerRot,
+                'state': pygame.surfarray.array3d(self.screen),
+                'reward': 1,
+                'done': False
+            })
+
 
     def showWelcomeAnimation(self):
         """Shows welcome screen animation of flappy bird"""
@@ -273,16 +299,12 @@ class flappyGame:
     def takeStep(self, action):
         print(action)
         reward = 1
-        for event in pygame.event.get():
-            if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
-                pygame.quit()
-                sys.exit()
-            # Player presses flap button (space or up key)
-            if action == 1:
-                if self.playery > -2 * IMAGES['player'][0].get_height():
-                    self.playerVelY = self.playerFlapAcc
-                    self.playerFlapped = True
-                    SOUNDS['wing'].play()
+        # Player presses flap button (space or up key)
+        if action == 1:
+            if self.playery > -2 * IMAGES['player'][0].get_height():
+                self.playerVelY = self.playerFlapAcc
+                self.playerFlapped = True
+                SOUNDS['wing'].play()
 
         # check for crash here
         crashTest = self.checkCrash({'x': self.playerx, 'y': self.playery, 'index': self.playerIndex},
@@ -500,6 +522,9 @@ class flappyGame:
 
         # if player crashes into ground
         if player['y'] + player['h'] >= BASEY - 1:
+            return [True, True]
+        # if player crashes into top of screen
+        elif player['y'] + player['h'] < 0:
             return [True, True]
         else:
 

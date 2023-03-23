@@ -3,7 +3,7 @@ from flappy_game import flappyGame
 import tensorflow as tf
 import random
 import matplotlib.pyplot as plt
-from pre_processing import pre_process
+from pre_processing import pre_process_cnn_input, pre_process_dnn_input
 from PIL import Image
 
 
@@ -20,50 +20,94 @@ def plotGraph(x, y, title, x_label, y_label):
     plt.show()
 
 
-# Maybe add exploration rate and exploration decay
 exploration = 1.0
 exploration_decay = 0.05
 
-agent = Agent()
-num_episodes = 100
+num_episodes = 1000
 
-scores = []
+def train_cnnq_model(exploration):
+    agent = Agent(cnn_model=True)
+    # Maybe add exploration rate and exploration decay
+    scores = []
 
-for i in range(num_episodes):
-    # Initialize the environment (game)
-    flappyGameObj = flappyGame()
-    state = flappyGameObj.main()
-    score = 0
-    rewards = []
-    states = []
-    actions = []
-    done = False
-    while not done:
-        random_float = random.uniform(0, 1)
-        if random_float > exploration:
-            action = agent.choose_action(state)
-        else:
-            action = random.randint(0, 1)
-            exploration -= exploration_decay
-            agent.store_action(tf.convert_to_tensor(action, 1))
+    for i in range(num_episodes):
+        # Initialize the environment (game)
+        flappyGameObj = flappyGame(cnn_model=True)
+        state = flappyGameObj.main()
+        score = 0
+        done = False
+        while not done:
+            random_float = random.uniform(0, 1)
+            if random_float > exploration:
+                action = agent.choose_action(state)
+            else:
+                action = random.randint(0, 1)
+                agent.store_action(tf.convert_to_tensor(action, 1))
 
-        state_reward_struct = flappyGameObj.takeStep(action)
+            state_reward_struct = flappyGameObj.takeStep(action)
 
-        # Perform pre-processing on the image
-        image = pre_process(state_reward_struct['state'])
+            # Perform pre-processing on the image
+            image = pre_process_cnn_input(state_reward_struct['state'])
 
-        state_ = image
+            state_ = image
 
-        agent.store_reward(state_reward_struct['reward'])
-        agent.store_state(state_)
-        state = state_
-        score += state_reward_struct['reward']
+            agent.store_reward(state_reward_struct['reward'])
+            agent.store_state(state_)
+            state = state_
+            score += state_reward_struct['reward']
 
-        done = state_reward_struct['done']
-        if done:
-            scores.append(score)
-            agent.learn()
-            print(f'episode done: {i + 1}\t score recieved: {score}')
+            done = state_reward_struct['done']
+            if done:
+                scores.append(score)
+                agent.learn()
+                print(f'episode done: {i + 1}\t score recieved: {score}')
+                exploration -= exploration_decay
 
-x = list(range(1, len(scores) + 1))
-plotGraph(x, scores, "Rewards over episodes", "Episode", "Score")
+    x = list(range(1, len(scores) + 1))
+    plotGraph(x, scores, "Rewards over episodes", "Episode", "Score")
+
+
+def train_dnnq_model(exploration):
+    agent = Agent(cnn_model=False)
+    # Maybe add exploration rate and exploration decay
+    scores = []
+
+    for i in range(num_episodes):
+        flappyGameObj = flappyGame(cnn_model=False)
+        state = flappyGameObj.main()
+        score = 0
+        done = False
+        while not done:
+            random_float = random.uniform(0, 1)
+            if random_float > exploration:
+                action = agent.choose_action(state)
+            else:
+                action = random.randint(0, 1)
+                agent.store_action(tf.convert_to_tensor(action, 1))
+
+            state_reward_struct = flappyGameObj.takeStep(action)
+
+            # state_,reward,done,_ = env.step(action)
+            # Perform normalization on the image
+
+            state_ = pre_process_dnn_input(state_reward_struct)
+
+            agent.store_reward(state_reward_struct['reward'])
+
+            agent.store_state(state_)
+            state = state_
+            score += state_reward_struct['reward']
+
+            done = state_reward_struct['done']
+            if done:
+                scores.append(score)
+                agent.learn()
+                exploration -= exploration_decay
+                print(f'episode done: {i + 1}\t score recieved: {score}')
+
+    x = list(range(1, len(scores) + 1))
+    plotGraph(x, scores, "Rewards over episodes", "Episode", "Score")
+
+
+# train_dnnq_model(exploration)
+train_cnnq_model(exploration)

@@ -1,4 +1,4 @@
-from models import CNNRLModel
+from models import DNNModel, CNNRLModel
 import tensorflow as tf
 import tensorflow_probability as tfp
 import numpy as np
@@ -9,10 +9,13 @@ import numpy as np
 """
 
 class Agent:
-    def __init__(self, gamma=0.95, lr=0.005, n_actions=2):
+    def __init__(self, gamma=0.95, lr=0.005, n_actions=2, cnn_model=True):
         self.gamma = gamma
         self.lr = lr
-        self.model = CNNRLModel(n_actions)
+        if cnn_model :
+            self.model = CNNRLModel(n_actions)
+        else:
+            self.model = DNNModel(n_actions)
         self.opt = tf.keras.optimizers.Adam(learning_rate=self.lr)
         self.action_memory = []
         self.reward_memory = []
@@ -28,6 +31,7 @@ class Agent:
         dist = tfp.distributions.Categorical(probs=prob, dtype=tf.float32)
         action = dist.sample()
         self.action_memory.append(action)
+        x = action.numpy()
         return int(action.numpy()[0])
  
     def store_reward(self, reward):
