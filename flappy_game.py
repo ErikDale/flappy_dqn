@@ -306,7 +306,6 @@ class flappyGame:
                 self.playerVelY = self.playerFlapAcc
                 self.playerFlapped = True
                 SOUNDS['wing'].play()
-                # If the player is outside the screen give less reward
                 reward = 1
 
         # check for crash here
@@ -315,7 +314,7 @@ class flappyGame:
 
         # If crash, break out of game loop
         if crashTest[0]:
-            reward = -40
+            reward = -10
             return {
                 'y': self.playery,
                 'groundCrash': crashTest[1],
@@ -335,7 +334,7 @@ class flappyGame:
         for pipe in self.upperPipes:
             pipeMidPos = pipe['x'] + IMAGES['pipe'][0].get_width() / 2
             if pipeMidPos <= playerMidPos < pipeMidPos + 4:
-                reward = 40
+                reward = self.score + 1
                 self.score += 1
                 SOUNDS['point'].play()
 

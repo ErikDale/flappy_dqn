@@ -1,4 +1,5 @@
-from agent import Agent
+import flappy_game
+from agent import Agent, Agent2
 from flappy_game import flappyGame
 import tensorflow as tf
 import random
@@ -28,9 +29,9 @@ def plotGraph(x, y, title, x_label, y_label):
 
 
 exploration = 1.0
-exploration_decay = 0.001
+exploration_decay = 0.01
 
-num_episodes = 100
+num_episodes = 150
 
 
 def random_output():
@@ -93,9 +94,11 @@ def train_dnnq_model(exploration):
             random_float = random.uniform(0, 1)
             if random_float > exploration:
                 action = agent.choose_action(state)
+                print("Exploitation")
             else:
                 action = random_output()
                 agent.store_action(tf.convert_to_tensor(action, 1))
+                print("Exploration")
 
             state_reward_struct = flappyGameObj.takeStep(action)
 
@@ -123,7 +126,64 @@ def train_dnnq_model(exploration):
     save_agent(agent, "./models/model1")
 
 
-train_dnnq_model(exploration)
+def train_dnnq_agent2(exploration):
+    scores = []
 
+    agent = Agent2(cnn_model=False)
+    game = flappyGame(cnn_model=False)
+    for i in range(num_episodes):
+        score = 0
+        state_old = game.main()
+        state_old = [state_old]
+        done = False
+        while not done:
+            # get move
+            random_float = random.uniform(0, 1)
+            if random_float > exploration:
+                final_move = agent.get_action(state_old)
+                print("Exploitation")
+            else:
+                final_move = random_output()
+                # agent.store_action(tf.convert_to_tensor(action, 1))
+                print("Exploration")
+
+
+            # perform move and get new state
+            state_reward_struct = game.takeStep(final_move)
+            state_new = pre_process_dnn_input(state_reward_struct)
+            state_new = [state_new]
+
+            reward = state_reward_struct['reward']
+
+            done = state_reward_struct['done']
+            # train short memory
+            agent.train_short_memory(state_old, [final_move], [reward], state_new, [done])
+
+            # remember
+            agent.remember(state_old, [final_move], [reward], state_new, [done])
+
+            state_old = state_new
+
+            score += reward
+
+            if done:
+                # train long memory, plot result
+
+                scores.append(score)
+                exploration -= exploration_decay
+
+                agent.train_long_memory()
+                print(f'episode done: {i + 1}\t score recieved: {score}')
+
+    x = list(range(1, len(scores) + 1))
+    plotGraph(x, scores, "Rewards over episodes", "Episode", "Score")
+    # Saving agent's model
+    save_agent(agent, "./models/model_agent2")
+
+
+
+train_dnnq_agent2(exploration)
+
+#train_dnnq_model(exploration)
 
 #train_cnnq_model(exploration)
