@@ -384,8 +384,10 @@ class flappyGame:
             self.screen.blit(IMAGES['pipe'][1], (lPipe['x'], lPipe['y']))
 
         self.screen.blit(IMAGES['base'], (self.basex, BASEY))
+
         # print score so player overlaps the score
-        self.showScore(self.score)
+        if not self.cnn_model:
+            self.showScore(self.score)
 
         # Player rotation has a threshold
         visibleRot = self.playerRotThr
@@ -526,7 +528,7 @@ class flappyGame:
         if player['y'] + player['h'] >= BASEY - 1:
             return [True, True]
         # if player crashes into top of screen
-        elif player['y'] + player['h'] < 0:
+        elif player['y'] + player['h'] < 22:
             return [True, True]
         else:
 
