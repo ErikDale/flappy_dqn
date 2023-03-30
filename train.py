@@ -1,4 +1,3 @@
-import flappy_game
 from agent import Agent, Agent2
 from flappy_game import flappyGame
 import tensorflow as tf
@@ -40,6 +39,7 @@ def random_output():
     else:
         return 1
 
+
 def train_cnnq_model(exploration):
     agent = Agent(cnn_model=True)
     # Maybe add exploration rate and exploration decay
@@ -79,6 +79,63 @@ def train_cnnq_model(exploration):
 
     x = list(range(1, len(scores) + 1))
     plotGraph(x, scores, "Rewards over episodes", "Episode", "Score")
+
+
+def train_cnnq_agent2(exploration):
+    scores = []
+
+    agent = Agent2(cnn_model=True)
+    game = flappyGame(cnn_model=True)
+    for i in range(num_episodes):
+        score = 0
+        state_old = game.main()
+        state_old = [state_old]
+        done = False
+        while not done:
+            # get move
+            random_float = random.uniform(0, 1)
+            if random_float > exploration:
+                final_move = agent.get_action(state_old)
+                print("Exploitation")
+            else:
+                final_move = random_output()
+                # agent.store_action(tf.convert_to_tensor(action, 1))
+                print("Exploration")
+
+            # perform move and get new state
+            state_reward_struct = game.takeStep(final_move)
+
+            state_new = pre_process_cnn_input(state_reward_struct['state'])
+
+            state_new = [state_new]
+
+            reward = state_reward_struct['reward']
+
+            done = state_reward_struct['done']
+            # train short memory
+            agent.train_short_memory(state_old, [final_move], [reward], state_new, [done])
+
+            # remember
+            agent.remember(state_old, [final_move], [reward], state_new, [done])
+
+            state_old = state_new
+
+            score += reward
+
+            if done:
+                # train long memory, plot result
+
+                scores.append(score)
+                exploration -= exploration_decay
+
+                agent.train_long_memory()
+                print(f'episode done: {i + 1}\t score recieved: {score}')
+
+    x = list(range(1, len(scores) + 1))
+    plotGraph(x, scores, "Rewards over episodes", "Episode", "Score")
+    # Saving agent's model
+    save_agent(agent, "./models/cnn_model_agent2")
+
 
 
 def train_dnnq_model(exploration):
@@ -182,8 +239,10 @@ def train_dnnq_agent2(exploration):
 
 
 
-train_dnnq_agent2(exploration)
+#train_dnnq_agent2(exploration)
 
 #train_dnnq_model(exploration)
 
 #train_cnnq_model(exploration)
+
+train_cnnq_agent2(exploration)
