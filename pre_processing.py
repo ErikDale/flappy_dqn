@@ -1,7 +1,14 @@
 import tensorflow as tf
+from PIL import Image
+import numpy as np
 
 
 def pre_process_cnn_input(image):
+    image = Image.fromarray(image)
+    image = image.crop((0, 0, 400, 288))
+    image = image.resize((102, 86))
+    image = image.resize((84, 84))
+    image = np.array(image)
     normalized_image = tf.image.per_image_standardization(image)
     gray_image = tf.image.rgb_to_grayscale(normalized_image)
     return gray_image
