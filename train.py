@@ -1,4 +1,4 @@
-from agent import Agent, Agent2
+from agent import Agent, Agent2, ActorCriticAgent, ActorCriticAgent2
 from flappy_game import flappyGame
 import tensorflow as tf
 import random
@@ -27,10 +27,12 @@ def plotGraph(x, y, title, x_label, y_label):
     plt.show()
 
 
-exploration = 1.0
-exploration_decay = 0.01
+epsilon = 0.7
 
-num_episodes = 150
+exploration = 1.0
+exploration_decay = 0.001
+
+num_episodes = 1500
 
 
 def random_output():
@@ -91,10 +93,16 @@ def train_cnnq_agent2(exploration):
         state_old = game.main()
         state_old = [state_old]
         done = False
+
+        exploration_bool = False
+        random_float = random.uniform(0, 1)
+        if random_float > epsilon:
+            exploration_bool = True
+
         while not done:
             # get move
             random_float = random.uniform(0, 1)
-            if random_float > exploration:
+            if not exploration_bool:
                 final_move = agent.get_action(state_old)
                 print("Exploitation")
             else:
@@ -136,6 +144,70 @@ def train_cnnq_agent2(exploration):
     # Saving agent's model
     save_agent(agent, "./models/cnn_model_agent2")
 
+
+def train_cnnq_actor_critic_agent(exploration):
+    scores = []
+
+    agent = ActorCriticAgent2(num_actions=2)
+    game = flappyGame(cnn_model=True)
+    for i in range(num_episodes):
+        score = 0
+        state = game.main()
+        done = False
+
+        exploration_bool = False
+        random_float = random.uniform(0, 1)
+        if random_float > epsilon:
+            exploration_bool = True
+
+        while not done:
+            # get move
+            '''random_float = random.uniform(0, 1)
+            if random_float > exploration:
+                action = agent.act(state)
+                print("Exploitation")
+            else:
+                action = random_output()
+                # agent.store_action(tf.convert_to_tensor(action, 1))
+                print("Exploration")'''
+
+            if not exploration_bool:
+                action = agent.act(state)
+                print("Exploitation")
+            else:
+                action = random_output()
+                # agent.store_action(tf.convert_to_tensor(action, 1))
+                print("Exploration")
+
+            # perform move and get new state
+            state_reward_struct = game.takeStep(action)
+
+            next_state = pre_process_cnn_input(state_reward_struct['state'])
+
+
+            reward = state_reward_struct['reward']
+
+            done = state_reward_struct['done']
+
+            # remember
+            agent.remember(state, action, reward, next_state)
+
+            state = next_state
+
+            score += reward
+
+            if done:
+                # train long memory, plot result
+                scores.append(score)
+                exploration -= exploration_decay
+
+                agent.learn()
+                print(f'episode done: {i + 1}\t score recieved: {score}')
+
+    x = list(range(1, len(scores) + 1))
+    plotGraph(x, scores, "Rewards over episodes", "Episode", "Score")
+    # Saving agent's model
+    save_agent(agent, "./models/actor_critic_model2")
 
 
 def train_dnnq_model(exploration):
@@ -245,4 +317,6 @@ def train_dnnq_agent2(exploration):
 
 #train_cnnq_model(exploration)
 
-train_cnnq_agent2(exploration)
+#train_cnnq_agent2(exploration)
+
+train_cnnq_actor_critic_agent(exploration)
