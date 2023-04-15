@@ -298,18 +298,18 @@ class flappyGame:
             self.fpsClock.tick(FPS)
 
     def takeStep(self, action):
-        # print(action)
+        print(action)
         if self.playery > 125 and self.playery < 325:
-            reward = 3
+            reward = 0.1
         else:
-            reward = 1
+            reward = 0.1
         # Player presses flap button (space or up key)
         if action == 1:
             if self.playery > -2 * IMAGES['player'][0].get_height():
                 self.playerVelY = self.playerFlapAcc
                 self.playerFlapped = True
                 SOUNDS['wing'].play()
-                #reward = 1
+                reward = 0.1
 
         # check for crash here
         crashTest = self.checkCrash({'x': self.playerx, 'y': self.playery, 'index': self.playerIndex},
@@ -317,7 +317,7 @@ class flappyGame:
 
         # If crash, break out of game loop
         if crashTest[0]:
-            reward = -10
+            reward = -1
             return {
                 'y': self.playery,
                 'groundCrash': crashTest[1],
@@ -337,7 +337,7 @@ class flappyGame:
         for pipe in self.upperPipes:
             pipeMidPos = pipe['x'] + IMAGES['pipe'][0].get_width() / 2
             if pipeMidPos <= playerMidPos < pipeMidPos + 4:
-                reward = self.score + 1
+                reward = 1
                 self.score += 1
                 SOUNDS['point'].play()
 
