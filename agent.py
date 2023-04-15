@@ -1,17 +1,119 @@
-from models import DNNModel, CNNRLModel, ActorCriticModel, ActorCriticModel2
+from models import DNNModel, CNNRLModel, ActorCriticModel, ActorCriticModel2, CriticModel, ActorModel
 import tensorflow as tf
 import tensorflow_probability as tfp
 import numpy as np
 from collections import deque
 import random
+import math
 
 """
 @author: Erik Dale
 @date: 21.03.23
 """
 
+
+class ActorCriticAgent2:
+    def __init__(self, num_actions, replay_buffer_size=20000, batch_size=32, discount_factor=0.95,
+                 actor_learning_rate=0.000001, critic_learning_rate=0.00001):
+        self.num_actions = num_actions
+        self.replay_buffer = deque(maxlen=replay_buffer_size)
+        self.batch_size = batch_size
+        self.discount_factor = discount_factor
+        self.gradient_clip_norm = 3
+
+        # Initialize actor-critic model
+        self.actor_model = ActorModel(num_actions)
+        self.critic_model = CriticModel()
+
+        self.model = ActorCriticModel2(num_actions)
+        self.actor_optimizer = tf.keras.optimizers.experimental.RMSprop(learning_rate=actor_learning_rate, momentum=0.95, weight_decay=0.9)
+        # self.actor_optimizer = tf.keras.optimizers.Adam(learning_rate=actor_learning_rate)
+        self.critic_optimizer = tf.keras.optimizers.Adam(learning_rate=critic_learning_rate)
+
+    def remember(self, state, action, reward, next_state, done):
+        self.replay_buffer.append((state, action, reward, next_state, done))
+
+    def act(self, state):
+        """
+        First the maximum value from the actor output is removed to prevent overflow during exponentiation.
+        Then the output is exponentiated and added a small epsilon value to ensure all probabilities are non-zero.
+        Finally, a normalization of the probabilities is done to obtain a policy, and sample an action from it.
+        """
+        state = np.expand_dims(state, axis=0)
+        actor_output = self.actor_model(state)
+        actor_output = tf.squeeze(actor_output)
+        actor_output = actor_output - tf.reduce_max(actor_output)
+        exp_actor_output = tf.exp(actor_output) + 1e-2  # Add small epsilon value to ensure non-zero
+        policy = exp_actor_output / tf.reduce_sum(exp_actor_output)
+        if math.isnan(policy[0]) or math.isnan(policy[1]):
+            action = 0
+        else:
+            # action = np.random.choice(self.num_actions, p=policy.numpy())
+            action = tf.argmax(policy)
+        return action
+
+    def learn(self):
+        # Find a batch size that is 10% of the whole replay buffer.
+        #self.batch_size = int(len(self.replay_buffer) * 0.1)
+
+        # Sample minibatch from replay buffer
+        minibatch = np.array(random.sample(self.replay_buffer, self.batch_size), dtype=object)
+
+        # Unpack minibatch
+        states = np.stack(minibatch[:, 0])
+        actions = minibatch[:, 1].astype(int)
+        rewards = minibatch[:, 2]
+        next_states = np.stack(minibatch[:, 3])
+        dones = minibatch[:, 4]
+
+        # Convert inputs to tensors
+        states = tf.convert_to_tensor(states, dtype=tf.float32)
+        actions = tf.convert_to_tensor(actions, dtype=tf.int32)
+        rewards = tf.convert_to_tensor(rewards, dtype=tf.float32)
+        next_states = tf.convert_to_tensor(next_states, dtype=tf.float32)
+        dones = tf.convert_to_tensor(dones, dtype=tf.float32)
+
+        # Compute critic loss
+        with tf.GradientTape() as tape:
+            inputs = (states, actions)
+            values = self.critic_model(inputs)
+
+            inputs = (next_states, actions)
+            next_values = self.critic_model(inputs)
+
+            next_values = np.array(next_values)
+
+            td_targets = rewards + self.discount_factor * next_values * (1 - dones)
+            td_errors = td_targets - values
+            critic_loss = tf.reduce_mean(tf.square(td_errors))
+
+        # Compute critic gradients and apply to optimizer
+        critic_grads = tape.gradient(critic_loss, self.critic_model.trainable_variables)
+        critic_grads, _ = tf.clip_by_global_norm(critic_grads, self.gradient_clip_norm)
+        self.critic_optimizer.apply_gradients(zip(critic_grads, self.critic_model.trainable_variables))
+
+        # Compute actor loss
+        with tf.GradientTape() as tape:
+            policy = self.actor_model(states)
+            actions_one_hot = tf.one_hot(actions, self.num_actions)
+            advantages = tf.stop_gradient(td_errors)
+            actor_loss = -tf.reduce_mean(
+                tf.reduce_sum(actions_one_hot * tf.math.log(policy + 1e-10), axis=1) * advantages)
+
+        # Compute actor gradients and apply to optimizer
+        actor_grads = tape.gradient(actor_loss, self.actor_model.trainable_variables)
+        actor_grads, _ = tf.clip_by_global_norm(actor_grads, self.gradient_clip_norm)
+        self.actor_optimizer.apply_gradients(zip(actor_grads, self.actor_model.trainable_variables))
+
+        #self.reset()
+
+    def reset(self):
+        self.replay_buffer.clear()
+
+
 class Agent:
-    def __init__(self, gamma=0.80, lr=0.001, n_actions=2, cnn_model=True):
+    def __init__(self, gamma=0.9, lr=0.001, n_actions=2, cnn_model=True, replay_buffer_size=10000):
+        self.replay_buffer = deque(maxlen=replay_buffer_size)
         self.gamma = gamma
         self.lr = lr
         if cnn_model:
@@ -19,72 +121,83 @@ class Agent:
         else:
             self.model = DNNModel(n_actions)
         self.opt = tf.keras.optimizers.Adam(learning_rate=self.lr)
-        self.action_memory = []
-        self.reward_memory = []
-        self.state_memory = []
+        self.n_actions = n_actions
 
-    def choose_action(self, state):
+    def act(self, state):
         """
-        Method that gives a state to the model, and then gets an action in return from the model
-        :param state: state of the game
-        :return: an action calculated by the model given a state
+        First the maximum value from the actor output is removed to prevent overflow during exponentiation.
+        Then the output is exponentiated and added a small epsilon value to ensure all probabilities are non-zero.
+        Finally, a normalization of the probabilities is done to obtain a policy, and sample an action from it.
         """
-        prob = self.model(state)
-        dist = tfp.distributions.Categorical(probs=prob, dtype=tf.float32)
-        action = dist.sample()
-        self.action_memory.append(action)
-        x = action.numpy()
-        return int(action.numpy()[0])
- 
-    def store_reward(self, reward):
-        self.reward_memory.append(reward)
+        state = np.expand_dims(state, axis=0)
+        actor_output = self.model(state)
+        actor_output = tf.squeeze(actor_output)
+        actor_output = actor_output - tf.reduce_max(actor_output)
+        exp_actor_output = tf.exp(actor_output) + 1e-7  # Add small epsilon value to ensure non-zero
+        policy = exp_actor_output / tf.reduce_sum(exp_actor_output)
+        if math.isnan(policy[0]) or math.isnan(policy[1]):
+            action = 0
+        else:
+            action = np.random.choice(self.n_actions, p=policy.numpy())
+            #action = tf.argmax(policy)
+        return action
 
-    def store_state(self, state):
-        self.state_memory.append(state)
 
-    def store_action(self, action):
-        self.action_memory.append(action)
+    def remember(self, state, action, reward, next_state, done):
+        self.replay_buffer.append((state, action, reward, next_state, done))
 
     def learn(self):
-        sum_reward = 0
-        discnt_rewards = []
-        self.reward_memory.reverse()
-        for r in self.reward_memory:
-            sum_reward = r + self.gamma * sum_reward
-            discnt_rewards.append(sum_reward)
-        discnt_rewards.reverse()
+        # Find a batch size that is 10% of the whole replay buffer.
+        if len(self.replay_buffer) > 200:
+            self.batch_size = int(len(self.replay_buffer) * 0.4)
+        else:
+            self.batch_size = int(len(self.replay_buffer))
 
-        for state, action, reward in zip(self.state_memory, self.action_memory, discnt_rewards):
-            with tf.GradientTape() as tape:
-                p = self.model(np.array(state), training=True)
-                loss = self.calc_loss(p, action, reward)
-                grads = tape.gradient(loss, self.model.trainable_variables)
-                self.opt.apply_gradients(zip(grads, self.model.trainable_variables))
+        # Sample minibatch from replay buffer
+        minibatch = np.array(random.sample(self.replay_buffer, self.batch_size), dtype=object)
 
-        self.reward_memory = []
-        self.action_memory = []
-        self.state_memory = []
+        # Unpack minibatch
+        states = np.stack(minibatch[:, 0])
+        actions = minibatch[:, 1].astype(int)
+        rewards = minibatch[:, 2]
+        next_states = np.stack(minibatch[:, 3])
+        dones = minibatch[:, 4]
 
-    '''def calc_loss(self, prob, action, reward):
-        reward = tf.convert_to_tensor(reward, 1)
-        # Add a small value to prob to avoid getting nan or inf
-        dist = tfp.distributions.Categorical(probs=prob + 1e-8, dtype=tf.float32)
-        log_prob = dist.log_prob(action)
-        loss = -log_prob * reward
-        return loss'''
+        # Convert data to tensors
+        states = tf.convert_to_tensor(states, dtype=tf.float32)
+        actions = tf.one_hot(actions, self.n_actions, dtype=tf.float32)
+        rewards = tf.convert_to_tensor(rewards, dtype=tf.float32)
+        next_states = tf.convert_to_tensor(next_states, dtype=tf.float32)
+        dones = tf.convert_to_tensor(dones, dtype=tf.float32)
 
-    def calc_loss(self, prob, action, reward):
-        reward = tf.convert_to_tensor(reward, 1)
-        # Add a small value to prob to avoid getting nan or inf
-        dist = tfp.distributions.Categorical(probs=prob + 1e-8, dtype=tf.float32)
-        prob_action = dist.probs_parameter()[0][int(action)]
-        loss = -tf.math.log(prob_action) * reward
-        return loss
+        # Compute target values
+        target_actions = self.model(next_states)
+        target_values = tf.reduce_max(target_actions, axis=1)
+        target_values = rewards + self.gamma * target_values * (1 - dones)
+
+        # Compute loss and update weights
+        with tf.GradientTape() as tape:
+            # Forward pass
+            predicted_actions = self.model(states)
+            predicted_values = tf.reduce_sum(predicted_actions * actions, axis=1)
+
+            # Compute loss
+            loss = tf.keras.losses.mean_squared_error(target_values, predicted_values)
+
+        # Compute gradients and update weights
+        gradients = tape.gradient(loss, self.model.trainable_variables)
+        self.opt.apply_gradients(zip(gradients, self.model.trainable_variables))
+
+        self.reset()
+
+    def reset(self):
+        self.replay_buffer.clear()
 
 
 MAX_MEMORY = 100_000
 BATCH_SIZE = 100
 LR = 0.001
+
 
 class Agent2:
     def __init__(self, gamma=0.9, lr=LR, n_actions=2, cnn_model=True):
@@ -170,7 +283,6 @@ class Agent2:
                     index = tf.argmax(probs[0], 0).numpy().item()
                     Q_new = reward[idx] + self.gamma * probs[0][index]
 
-
                 # Checking if the target already contain a numpy array
                 if isinstance(target[0][0], np.ndarray):
                     list = target[0][0]
@@ -188,9 +300,8 @@ class Agent2:
                     list = tf.convert_to_tensor(list)
                     target = [list]
 
-
-            #target = tf.Variable(target)
-            #pred = tf.Variable(pred)
+            # target = tf.Variable(target)
+            # pred = tf.Variable(pred)
             loss = self.criterion(target, pred)
             # loss.backward()
             x = self.model.trainable_variables
@@ -210,7 +321,7 @@ class ActorCriticAgent:
         self.num_actions = num_actions
 
     def learn(self):
-        #if len(self.replay_buffer) < self.batch_size:
+        # if len(self.replay_buffer) < self.batch_size:
         #    return
 
         self.batch_size = int(len(self.replay_buffer) * 0.1)
@@ -242,7 +353,8 @@ class ActorCriticAgent:
 
             # Compute the policy loss between the actor output and the estimated value of the action by the critic
             advantages = target_q_values - tf.reduce_mean(current_state_expected_action_values, axis=1)
-            actor_loss = tf.keras.losses.categorical_crossentropy(actions_mask, current_state_expected_action_values, from_logits=False)
+            actor_loss = tf.keras.losses.categorical_crossentropy(actions_mask, current_state_expected_action_values,
+                                                                  from_logits=False)
             actor_loss = tf.reduce_mean(actor_loss * tf.expand_dims(advantages, axis=-1))
 
             # Compute the total loss as a weighted sum of the critic and actor losses
@@ -270,80 +382,3 @@ class ActorCriticAgent:
     def reset(self):
         self.replay_buffer = []
         self.steps = 0
-
-
-class ActorCriticAgent2:
-    def __init__(self, num_actions, replay_buffer_size=10000, batch_size=16, discount_factor=0.99, actor_learning_rate=1e-4, critic_learning_rate=1e-3):
-        self.num_actions = num_actions
-        self.replay_buffer = deque(maxlen=replay_buffer_size)
-        self.batch_size = batch_size
-        self.discount_factor = discount_factor
-
-        # Initialize actor-critic model
-        self.model = ActorCriticModel2(num_actions)
-        self.actor_optimizer = tf.keras.optimizers.Adam(learning_rate=actor_learning_rate)
-        self.critic_optimizer = tf.keras.optimizers.Adam(learning_rate=critic_learning_rate)
-
-    def remember(self, state, action, reward, next_state):
-        self.replay_buffer.append((state, action, reward, next_state))
-
-    def act(self, state):
-        """
-        First the maximum value from the actor output is removed to prevent overflow during exponentiation.
-        Then the output is exponentiated and added a small epsilon value to ensure all probabilities are non-zero.
-        Finally, a normalization of the probabilities is done to obtain a policy, and sample an action from it.
-        """
-        state = np.expand_dims(state, axis=0)
-        actor_output, _ = self.model(state)
-        actor_output = tf.squeeze(actor_output)
-        actor_output = actor_output - tf.reduce_max(actor_output)
-        exp_actor_output = tf.exp(actor_output) + 1e-7  # Add small epsilon value to ensure non-zero
-        policy = exp_actor_output / tf.reduce_sum(exp_actor_output)
-        action = np.random.choice(self.num_actions, p=policy.numpy())
-        return action
-
-    def learn(self):
-        self.batch_size = int(len(self.replay_buffer) * 0.1)
-
-        # Sample minibatch from replay buffer
-        minibatch = np.array(random.sample(self.replay_buffer, self.batch_size), dtype=object)
-
-        # Unpack minibatch
-        states = np.stack(minibatch[:, 0])
-        actions = minibatch[:, 1].astype(int)
-        rewards = minibatch[:, 2]
-        next_states = np.stack(minibatch[:, 3])
-
-        # Convert actions to one-hot encoding
-        actions_mask = tf.one_hot(actions, self.num_actions)
-
-        input = (next_states, actions)
-        # Compute target values for critic
-        _, critic_next = self.model(input)
-        target = rewards + self.discount_factor * critic_next.numpy().flatten()
-
-        # Compute critic loss
-        with tf.GradientTape() as tape:
-            input = (states, actions)
-            _, critic_output = self.model(input)
-            critic_output = tf.squeeze(critic_output)
-            target = target.astype(np.float32)
-            critic_loss = tf.keras.losses.mean_squared_error(target, critic_output)
-
-        # Compute critic gradients and update weights
-        critic_grads = tape.gradient(critic_loss, self.model.trainable_variables)
-        self.critic_optimizer.apply_gradients(zip(critic_grads, self.model.trainable_variables))
-
-        # Compute actor loss
-        with tf.GradientTape() as tape:
-            actor_output, _ = self.model(input)
-            actor_loss = -tf.reduce_mean(tf.math.log(tf.reduce_sum(actor_output * actions_mask, axis=1)) * (target - critic_output))
-
-        # Compute actor gradients and update weights
-        actor_grads = tape.gradient(actor_loss, self.model.trainable_variables)
-        self.actor_optimizer.apply_gradients(zip(actor_grads, self.model.trainable_variables))
-        self.reset()
-
-    def reset(self):
-        self.replay_buffer.clear()
-
