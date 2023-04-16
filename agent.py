@@ -1,4 +1,4 @@
-from models import DNNModel, CNNRLModel, ActorCriticModel, ActorCriticModel2, CriticModel, ActorModel
+from models import DNNModel, CNNRLModel, CriticModel, ActorModel
 import tensorflow as tf
 import tensorflow_probability as tfp
 import numpy as np
@@ -12,9 +12,21 @@ import math
 """
 
 
-class ActorCriticAgent2:
+class ActorCriticAgent:
+    """
+    Actor-Critic agent that learns to interact with an environment.
+    :param num_actions: the number of actions available to the agent.
+    :param replay_buffer_size: the maximum size of the replay buffer. Default is 20000.
+    :param batch_size: the size of the minibatch sampled from the replay buffer during training. Default is 32.
+    :param discount_factor: the discount factor for future rewards. Default is 0.95.
+    :param actor_learning_rate: the learning rate for the actor model. Default is 0.0001.
+    :param critic_learning_rate: the learning rate for the critic model. Default is 0.001.
+    """
     def __init__(self, num_actions, replay_buffer_size=20000, batch_size=32, discount_factor=0.95,
-                 actor_learning_rate=0.000001, critic_learning_rate=0.00001):
+                 actor_learning_rate=0.0001, critic_learning_rate=0.001):
+        """
+        Initialize the actor critic agent.
+        """
         self.num_actions = num_actions
         self.replay_buffer = deque(maxlen=replay_buffer_size)
         self.batch_size = batch_size
@@ -25,25 +37,32 @@ class ActorCriticAgent2:
         self.actor_model = ActorModel(num_actions)
         self.critic_model = CriticModel()
 
-        self.model = ActorCriticModel2(num_actions)
-        self.actor_optimizer = tf.keras.optimizers.experimental.RMSprop(learning_rate=actor_learning_rate, momentum=0.95, weight_decay=0.9)
-        # self.actor_optimizer = tf.keras.optimizers.Adam(learning_rate=actor_learning_rate)
+        # self.actor_optimizer = tf.keras.optimizers.experimental.RMSprop(learning_rate=actor_learning_rate, momentum=0.95, weight_decay=0.9)
+        self.actor_optimizer = tf.keras.optimizers.Adam(learning_rate=actor_learning_rate)
         self.critic_optimizer = tf.keras.optimizers.Adam(learning_rate=critic_learning_rate)
 
     def remember(self, state, action, reward, next_state, done):
+        """
+        Store a new experience tuple in the replay buffer.
+        :param state: the current state of the environment.
+        :param action: the action taken by the agent.
+        :param reward: the reward received by the agent.
+        :param next_state: the next state of the environment.
+        :param done: whether the episode has terminated or not.
+        """
         self.replay_buffer.append((state, action, reward, next_state, done))
 
     def act(self, state):
         """
-        First the maximum value from the actor output is removed to prevent overflow during exponentiation.
-        Then the output is exponentiated and added a small epsilon value to ensure all probabilities are non-zero.
-        Finally, a normalization of the probabilities is done to obtain a policy, and sample an action from it.
+        Generate an action using the current policy.
+        :param state: the current state of the environment.
+        :return: the chosen action.
         """
         state = np.expand_dims(state, axis=0)
         actor_output = self.actor_model(state)
         actor_output = tf.squeeze(actor_output)
         actor_output = actor_output - tf.reduce_max(actor_output)
-        exp_actor_output = tf.exp(actor_output) + 1e-2  # Add small epsilon value to ensure non-zero
+        exp_actor_output = tf.exp(actor_output) + 1e-2  # Add small epsilon value to ensure non-zero values
         policy = exp_actor_output / tf.reduce_sum(exp_actor_output)
         if math.isnan(policy[0]) or math.isnan(policy[1]):
             action = 0
@@ -53,9 +72,9 @@ class ActorCriticAgent2:
         return action
 
     def learn(self):
-        # Find a batch size that is 10% of the whole replay buffer.
-        #self.batch_size = int(len(self.replay_buffer) * 0.1)
-
+        """
+        Update the actor and critic models using a batch of experiences from the replay buffer.
+        """
         # Sample minibatch from replay buffer
         minibatch = np.array(random.sample(self.replay_buffer, self.batch_size), dtype=object)
 
@@ -105,14 +124,20 @@ class ActorCriticAgent2:
         actor_grads, _ = tf.clip_by_global_norm(actor_grads, self.gradient_clip_norm)
         self.actor_optimizer.apply_gradients(zip(actor_grads, self.actor_model.trainable_variables))
 
-        #self.reset()
-
-    def reset(self):
-        self.replay_buffer.clear()
-
 
 class Agent:
-    def __init__(self, gamma=0.9, lr=0.001, n_actions=2, cnn_model=True, replay_buffer_size=10000):
+    """
+    Agent that learns to interact with an environment.
+    :param gamma: the discount factor for future rewards. Default is 0.95.
+    :param lr: the learning rate for the optimizer. Default is 0.00001.
+    :param n_actions: the number of actions available to the agent. Default is 2.
+    :param cnn_model: a boolean indicating whether to use a convolutional neural network as the model. Default is True.
+    :param replay_buffer_size: the maximum size of the replay buffer. Default is 20000.
+    """
+    def __init__(self, gamma=0.95, lr=0.00001, n_actions=2, cnn_model=True, replay_buffer_size=20000, batch_size=32):
+        """
+        Initializes a new Agent object.
+        """
         self.replay_buffer = deque(maxlen=replay_buffer_size)
         self.gamma = gamma
         self.lr = lr
@@ -120,14 +145,17 @@ class Agent:
             self.model = CNNRLModel(n_actions)
         else:
             self.model = DNNModel(n_actions)
-        self.opt = tf.keras.optimizers.Adam(learning_rate=self.lr)
+        # self.opt = tf.keras.optimizers.Adam(learning_rate=self.lr)
+        self.opt = tf.keras.optimizers.experimental.RMSprop(learning_rate=self.lr, momentum=0.95, weight_decay=0.9)
         self.n_actions = n_actions
+        self.gradient_clip_norm = 3
+        self.batch_size = batch_size
 
     def act(self, state):
         """
-        First the maximum value from the actor output is removed to prevent overflow during exponentiation.
-        Then the output is exponentiated and added a small epsilon value to ensure all probabilities are non-zero.
-        Finally, a normalization of the probabilities is done to obtain a policy, and sample an action from it.
+        Generate an action using the current policy.
+        :param state: the current state of the environment.
+        :return: the chosen action.
         """
         state = np.expand_dims(state, axis=0)
         actor_output = self.model(state)
@@ -138,21 +166,25 @@ class Agent:
         if math.isnan(policy[0]) or math.isnan(policy[1]):
             action = 0
         else:
-            action = np.random.choice(self.n_actions, p=policy.numpy())
-            #action = tf.argmax(policy)
+            # action = np.random.choice(self.n_actions, p=policy.numpy())
+            action = tf.argmax(policy)
         return action
 
-
     def remember(self, state, action, reward, next_state, done):
+        """
+        Store a new experience tuple in the replay buffer.
+        :param state: the current state of the environment.
+        :param action: the action taken by the agent.
+        :param reward: the reward received by the agent.
+        :param next_state: the next state of the environment.
+        :param done: whether the episode has terminated or not.
+        """
         self.replay_buffer.append((state, action, reward, next_state, done))
 
     def learn(self):
-        # Find a batch size that is 10% of the whole replay buffer.
-        if len(self.replay_buffer) > 200:
-            self.batch_size = int(len(self.replay_buffer) * 0.4)
-        else:
-            self.batch_size = int(len(self.replay_buffer))
-
+        """
+        Train the agent's model using experiences from the replay buffer.
+        """
         # Sample minibatch from replay buffer
         minibatch = np.array(random.sample(self.replay_buffer, self.batch_size), dtype=object)
 
@@ -172,6 +204,7 @@ class Agent:
 
         # Compute target values
         target_actions = self.model(next_states)
+        target_actions = tf.squeeze(target_actions)  # remove dimensions of size 1
         target_values = tf.reduce_max(target_actions, axis=1)
         target_values = rewards + self.gamma * target_values * (1 - dones)
 
@@ -179,6 +212,7 @@ class Agent:
         with tf.GradientTape() as tape:
             # Forward pass
             predicted_actions = self.model(states)
+            predicted_actions = tf.squeeze(predicted_actions)
             predicted_values = tf.reduce_sum(predicted_actions * actions, axis=1)
 
             # Compute loss
@@ -186,15 +220,11 @@ class Agent:
 
         # Compute gradients and update weights
         gradients = tape.gradient(loss, self.model.trainable_variables)
+        gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clip_norm)
         self.opt.apply_gradients(zip(gradients, self.model.trainable_variables))
 
-        self.reset()
 
-    def reset(self):
-        self.replay_buffer.clear()
-
-
-MAX_MEMORY = 100_000
+'''MAX_MEMORY = 100_000
 BATCH_SIZE = 100
 LR = 0.001
 
@@ -259,13 +289,13 @@ class Agent2:
             reward = tf.convert_to_tensor(reward, 1)
             # (n, x)
 
-            '''if len(state.shape) == 1:
+            if len(state.shape) == 1:
                 # (1, x)
                 state = torch.unsqueeze(state, 0)
                 next_state = torch.unsqueeze(next_state, 0)
                 action = torch.unsqueeze(action, 0)
                 reward = torch.unsqueeze(reward, 0)
-                done = (done,)'''
+                done = (done,)
 
             # 1: predicted Q values with current state
             pred = self.model(state, training=True)
@@ -381,4 +411,4 @@ class ActorCriticAgent:
 
     def reset(self):
         self.replay_buffer = []
-        self.steps = 0
+        self.steps = 0'''

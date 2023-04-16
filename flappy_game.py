@@ -7,6 +7,12 @@ from PIL import Image
 from pre_processing import pre_process_cnn_input, pre_process_dnn_input
 
 '''
+Heavily inspired by the code found at https://github.com/sourabhv/FlapPyBird
+@date 27.02.2023 
+'''
+
+
+'''
 img = pygame.surfarray.array3d(self.screen)
 image = Image.fromarray(img)
 image.save('./image.png')

@@ -1,15 +1,23 @@
-from agent import Agent, Agent2, ActorCriticAgent, ActorCriticAgent2
+from agent import Agent, ActorCriticAgent
 from flappy_game import flappyGame
-import tensorflow as tf
 import random
 import matplotlib.pyplot as plt
 from pre_processing import pre_process_cnn_input, pre_process_dnn_input
-from PIL import Image
 import pickle
 
+"""
+@author: Erik Dale
+@date: 22.03.23
+"""
 
-# Save agent's model parameters to disk
+
 def save_agent(agent, filename, actor):
+    """
+    Saves an agent's model to file
+    :param agent: the agent that has the model that is to be saved
+    :param filename: what file to save the model to
+    :param actor: a bool that says if the agent is an actor critic agent or not
+    """
     with open(filename, 'wb') as f:
         if actor:
             pickle.dump(agent.actor_model, f)
@@ -18,6 +26,15 @@ def save_agent(agent, filename, actor):
 
 
 def plotGraph(x, y, title, x_label, y_label):
+    """
+    Plots a 2D graph
+    :param x: x-axis values
+    :param y: y-axis values
+    :param title: title of the graph
+    :param x_label: name of x-axis
+    :param y_label: name of y-axis
+    """
+
     # Create a plot
     plt.plot(x, y)
 
@@ -30,51 +47,57 @@ def plotGraph(x, y, title, x_label, y_label):
     plt.show()
 
 
+# Epsilon starting value
 epsilon = 1
 
-
-
-exploration = 1.0
-exploration_decay = 0.001
-
+# Number of episodes to train
 num_episodes = 1000
 
-# Makes epsilon go from 1 to 0.1 in 1000 episodes
-epsilon_decay = 0.9 / 1000
+# Makes epsilon go from 1 to 0.1 in num_episodes episodes
+epsilon_decay = 0.9 / num_episodes
 
 
 def random_output():
+    """
+    Makes a random action with 90% chance of taking the action 0
+    and 10% chance of taking the action 1
+    :return: either 0 or 1 (actions)
+    """
     if random.random() < 0.9:
         return 0
     else:
         return 1
 
 
-def train_cnnq_actor_critic_agent(exploration, epsilon):
-    scores = []
-    agent = ActorCriticAgent2(num_actions=2)
-    game = flappyGame(cnn_model=True)
+def train_agent(epsilon, actor_critic, cnn):
+    """
+    Trains the different actors with their different models (cnn models, dnn models, actor and critic models)
+    :param epsilon: starting value of epsilon
+    :param actor_critic: if the agent that is to be trained is an actor critic agent or not
+    :param cnn: if the agent that is to be trained uses a cnn model or not
+    """
+    best_score = 0  # best overall score
+    has_learned = False  # tells if the training has started or not
+    scores = []  # list of scores for plotting
+    if actor_critic:
+        agent = ActorCriticAgent(num_actions=2)  # initialization of actor critic agent
+    else:
+        agent = Agent(n_actions=2, cnn_model=cnn)  # initialization of cnn agent
+
+    game = flappyGame(cnn_model=cnn)  # initialization of game
+
     for i in range(num_episodes):
         score = 0
-        state = game.main()
+        state = game.main()  # return initial state
         done = False
 
+        # implement epsilon greedy action selection
         exploration_bool = False
         random_float = random.uniform(0, 1)
         if random_float < epsilon:
             exploration_bool = True
 
         while not done:
-            # get move
-            '''random_float = random.uniform(0, 1)
-            if random_float > exploration:
-                action = agent.act(state)
-                print("Exploitation")
-            else:
-                action = random_output()
-                # agent.store_action(tf.convert_to_tensor(action, 1))
-                print("Exploration")'''
-
             if not exploration_bool:
                 action = agent.act(state)
                 print("Exploitation")
@@ -83,51 +106,65 @@ def train_cnnq_actor_critic_agent(exploration, epsilon):
                 # agent.store_action(tf.convert_to_tensor(action, 1))
                 print("Exploration")
 
-            # perform move and get new state
+            # perform action and get new state, reward and done bool
             state_reward_struct = game.takeStep(action)
 
-            next_state = pre_process_cnn_input(state_reward_struct['state'])
+            # checks if the agent utilizes a cnn model or not
+            # it has to check this to see what pre-processing to apply
+            if cnn:
+                next_state = pre_process_cnn_input(state_reward_struct['state'])
+            else:
+                next_state = pre_process_dnn_input(state_reward_struct)
 
             reward = state_reward_struct['reward']
-
             done = state_reward_struct['done']
 
+            # convert done bool to 1 or 0
             if done:
                 done = 1
             else:
                 done = 0
-            # remember
+
+            # fill up the experience replay memory
             agent.remember(state, action, reward, next_state, done)
 
-            state = next_state
+            state = next_state  # update state
 
             score += reward
 
             if done:
-                # train long memory, plot result
+                if has_learned:
+                    # Save the model if the current score is better than the best
+                    # overall score
+                    if score > best_score:
+                        save_agent(agent, "models/dnn_model_best", actor=actor_critic)
+                        best_score = score  # Update the best score
+
+                # append score to be plotted if it was exploitation
                 if not exploration_bool:
                     scores.append(score)
 
-                exploration -= exploration_decay
+                epsilon -= epsilon_decay
 
-                # Stop decreasing episolon after it has hit a value of 0.1
-                if epsilon > 0.1:
-                    epsilon -= epsilon_decay
-
+                # start learning when the memory is bigger than 3000
                 if len(agent.replay_buffer) > 3000:
                     agent.learn()
+                    has_learned = True
 
                 print(f'episode done: {i + 1}\t score recieved: {score}')
 
     x = list(range(1, len(scores) + 1))
     plotGraph(x, scores, "Rewards over episodes", "Episode", "Score")
-    # Saving agent's model
-    save_agent(agent, "./models/actor_critic_model2", actor=True)
 
 
-def train_cnnq_model(exploration):
+'''def train_cnnq_model(epsilon):
+    """
+    Trains the agent that uses the cnn model
+    :param epsilon: starting value of epsilon
+    """
     scores = []
-
+    best_score = 0
+    has_learned = False
     agent = Agent(n_actions=2, cnn_model=True)
     game = flappyGame(cnn_model=True)
 
@@ -143,15 +180,6 @@ def train_cnnq_model(exploration):
 
         while not done:
             # get move
-            '''random_float = random.uniform(0, 1)
-            if random_float > exploration:
-                action = agent.act(state)
-                print("Exploitation")
-            else:
-                action = random_output()
-                # agent.store_action(tf.convert_to_tensor(action, 1))
-                print("Exploration")'''
-
             if not exploration_bool:
                 action = agent.act(state)
                 print("Exploitation")
@@ -181,19 +209,100 @@ def train_cnnq_model(exploration):
             score += reward
 
             if done:
-                # train long memory, plot result
+                if has_learned:
+                    # Save the model if the current score is better than the best
+                    # overall score
+                    if score > best_score:
+                        save_agent(agent, "./models/cnn_model", actor=True)
+                        best_score = score  # Update the best score
+
                 if not exploration_bool:
                     scores.append(score)
 
-                exploration -= exploration_decay
+                if agent.replay_buffer > 3000:
+                    agent.learn()
+                    has_learned = True
 
-                agent.learn()
+                print(f'episode done: {i + 1}\t score recieved: {score}')
+
+    x = list(range(1, len(scores) + 1))
+    plotGraph(x, scores, "Rewards over episodes", "Episode", "Score")
+
+
+def train_dnnq_model(exploration):
+    scores = []
+    best_score = 0
+    has_learned = False
+    agent = Agent(n_actions=2, cnn_model=False)
+    game = flappyGame(cnn_model=False)
+    for i in range(num_episodes):
+        score = 0
+        state = game.main()
+        done = False
+
+        exploration_bool = False
+        random_float = random.uniform(0, 1)
+        if random_float > epsilon:
+            exploration_bool = True
+
+        while not done:
+            # get move
+            random_float = random.uniform(0, 1)
+            if random_float > exploration:
+                action = agent.act(state)
+                print("Exploitation")
+            else:
+                action = random_output()
+                # agent.store_action(tf.convert_to_tensor(action, 1))
+                print("Exploration")
+
+            if not exploration_bool:
+                action = agent.act(state)
+                print("Exploitation")
+            else:
+                action = random_output()
+                # agent.store_action(tf.convert_to_tensor(action, 1))
+                print("Exploration")
+
+            state_reward_struct = game.takeStep(action)
+
+            next_state = pre_process_dnn_input(state_reward_struct)
+
+            reward = state_reward_struct['reward']
+
+            done = state_reward_struct['done']
+
+            if done:
+                done = 1
+            else:
+                done = 0
+            # remember
+            agent.remember(state, action, reward, next_state, done)
+
+            state = next_state
+
+            score += reward
+
+            if done:
+                if has_learned:
+                    # Save the model if the current score is better than the best
+                    # overall score
+                    if score > best_score:
+                        save_agent(agent, "./models/dnn_model", actor=True)
+                        best_score = score  # Update the best score
+
+                if not exploration_bool:
+                    scores.append(score)
+
+                if agent.replay_buffer > 3000:
+                    agent.learn()
+                    has_learned = True
                 print(f'episode done: {i + 1}\t score recieved: {score}')
 
     x = list(range(1, len(scores) + 1))
     plotGraph(x, scores, "Rewards over episodes", "Episode", "Score")
     # Saving agent's model
-    save_agent(agent, "./models/cnn_model", actor=False)
+    # save_agent(agent, "./models/model1", actor=False)
 
 
 def train_cnnq_agent2(exploration):
@@ -247,7 +356,6 @@ def train_cnnq_agent2(exploration):
                 # train long memory, plot result
 
                 scores.append(score)
-                exploration -= exploration_decay
 
                 agent.train_long_memory()
                 print(f'episode done: {i + 1}\t score recieved: {score}')
@@ -256,51 +364,6 @@ def train_cnnq_agent2(exploration):
     plotGraph(x, scores, "Rewards over episodes", "Episode", "Score")
     # Saving agent's model
     save_agent(agent, "./models/cnn_model_agent2", actor=False)
-
-
-def train_dnnq_model(exploration):
-    agent = Agent(cnn_model=False)
-    # Maybe add exploration rate and exploration decay
-    scores = []
-    flappyGameObj = flappyGame(cnn_model=False)
-    for i in range(num_episodes):
-        state = flappyGameObj.main()
-        score = 0
-        done = False
-        while not done:
-            random_float = random.uniform(0, 1)
-            if random_float > exploration:
-                action = agent.choose_action(state)
-                print("Exploitation")
-            else:
-                action = random_output()
-                agent.store_action(tf.convert_to_tensor(action, 1))
-                print("Exploration")
-
-            state_reward_struct = flappyGameObj.takeStep(action)
-
-            # state_,reward,done,_ = env.step(action)
-            # Perform normalization on the image
-
-            state_ = pre_process_dnn_input(state_reward_struct)
-
-            agent.store_reward(state_reward_struct['reward'])
-
-            agent.store_state(state_)
-            state = state_
-            score += state_reward_struct['reward']
-
-            done = state_reward_struct['done']
-            if done:
-                scores.append(score)
-                agent.learn()
-                exploration -= exploration_decay
-                print(f'episode done: {i + 1}\t score recieved: {score}')
-
-    x = list(range(1, len(scores) + 1))
-    plotGraph(x, scores, "Rewards over episodes", "Episode", "Score")
-    # Saving agent's model
-    save_agent(agent, "./models/model1", actor=False)
 
 
 def train_dnnq_agent2(exploration):
@@ -346,7 +409,6 @@ def train_dnnq_agent2(exploration):
                 # train long memory, plot result
 
                 scores.append(score)
-                exploration -= exploration_decay
 
                 agent.train_long_memory()
                 print(f'episode done: {i + 1}\t score recieved: {score}')
@@ -354,15 +416,15 @@ def train_dnnq_agent2(exploration):
     x = list(range(1, len(scores) + 1))
     plotGraph(x, scores, "Rewards over episodes", "Episode", "Score")
     # Saving agent's model
-    save_agent(agent, "./models/model_agent2", actor=False)
+    save_agent(agent, "./models/model_agent2", actor=False)'''
 
 
 # train_dnnq_agent2(exploration)
 
 # train_dnnq_model(exploration)
 
-#train_cnnq_model(exploration)
+# train_cnnq_model(exploration)
 
 # train_cnnq_agent2(exploration)
 
-train_cnnq_actor_critic_agent(exploration, epsilon)
+train_agent(epsilon, False, False)
