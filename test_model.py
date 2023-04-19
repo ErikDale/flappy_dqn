@@ -39,7 +39,7 @@ def test_agent(actor_critic, cnn):
         agent = Agent(cnn_model=cnn)
 
     # Load the saved model parameters
-    agent = load_agent(agent, "models/actor_critic_model_best", actor=actor_critic)
+    agent = load_agent(agent, "models/dnn_model_long_medium", actor=actor_critic)
 
     # Initialize the Flappy Bird game environment
     flappyGameObj = flappyGame(cnn_model=cnn)
@@ -51,7 +51,7 @@ def test_agent(actor_critic, cnn):
     done = False
     while not done:
         # Get the action from the agent
-        action = agent.act(state)
+        action = agent.choose_action(state)
 
         # Take a step in the environment
         state_reward_struct = flappyGameObj.takeStep(action)
@@ -68,4 +68,4 @@ def test_agent(actor_critic, cnn):
             print("Game over")
 
 
-test_agent(actor_critic=True, cnn=True)
+test_agent(actor_critic=False, cnn=False)

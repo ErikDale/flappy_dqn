@@ -31,7 +31,7 @@ class ActorCriticAgent:
         self.replay_buffer = deque(maxlen=replay_buffer_size)
         self.batch_size = batch_size
         self.discount_factor = discount_factor
-        self.gradient_clip_norm = 3
+        self.gradient_clip_norm = 1
 
         # Initialize actor-critic model
         self.actor_model = ActorModel(num_actions)
@@ -52,7 +52,7 @@ class ActorCriticAgent:
         """
         self.replay_buffer.append((state, action, reward, next_state, done))
 
-    def act(self, state):
+    def choose_action(self, state):
         """
         Generate an action using the current policy.
         :param state: the current state of the environment.
@@ -134,7 +134,7 @@ class Agent:
     :param cnn_model: a boolean indicating whether to use a convolutional neural network as the model. Default is True.
     :param replay_buffer_size: the maximum size of the replay buffer. Default is 20000.
     """
-    def __init__(self, gamma=0.95, lr=0.00001, n_actions=2, cnn_model=True, replay_buffer_size=20000, batch_size=32):
+    def __init__(self, gamma=0.95, lr=0.000001, n_actions=2, cnn_model=True, replay_buffer_size=20000, batch_size=32):
         """
         Initializes a new Agent object.
         """
@@ -148,10 +148,10 @@ class Agent:
         # self.opt = tf.keras.optimizers.Adam(learning_rate=self.lr)
         self.opt = tf.keras.optimizers.experimental.RMSprop(learning_rate=self.lr, momentum=0.95, weight_decay=0.9)
         self.n_actions = n_actions
-        self.gradient_clip_norm = 3
+        self.gradient_clip_norm = 1
         self.batch_size = batch_size
 
-    def act(self, state):
+    def choose_action(self, state):
         """
         Generate an action using the current policy.
         :param state: the current state of the environment.
@@ -161,7 +161,7 @@ class Agent:
         actor_output = self.model(state)
         actor_output = tf.squeeze(actor_output)
         actor_output = actor_output - tf.reduce_max(actor_output)
-        exp_actor_output = tf.exp(actor_output) + 1e-7  # Add small epsilon value to ensure non-zero
+        exp_actor_output = tf.exp(actor_output) + 1e-2  # Add small epsilon value to ensure non-zero
         policy = exp_actor_output / tf.reduce_sum(exp_actor_output)
         if math.isnan(policy[0]) or math.isnan(policy[1]):
             action = 0

@@ -51,7 +51,7 @@ def plotGraph(x, y, title, x_label, y_label):
 epsilon = 1
 
 # Number of episodes to train
-num_episodes = 1000
+num_episodes = 5000
 
 # Makes epsilon go from 1 to 0.1 in num_episodes episodes
 epsilon_decay = 0.9 / num_episodes
@@ -99,7 +99,7 @@ def train_agent(epsilon, actor_critic, cnn):
 
         while not done:
             if not exploration_bool:
-                action = agent.act(state)
+                action = agent.choose_action(state)
                 print("Exploitation")
             else:
                 action = random_output()
@@ -136,8 +136,8 @@ def train_agent(epsilon, actor_critic, cnn):
                 if has_learned:
                     # Save the model if the current score is better than the best
                     # overall score
-                    if score > best_score:
-                        save_agent(agent, "models/dnn_model_best", actor=actor_critic)
+                    if score > best_score and not exploration_bool:
+                        save_agent(agent, "models/cnn_model_long_medium", actor=actor_critic)
                         best_score = score  # Update the best score
 
                 # append score to be plotted if it was exploitation
@@ -427,4 +427,4 @@ def train_dnnq_agent2(exploration):
 
 # train_cnnq_agent2(exploration)
 
-train_agent(epsilon, False, False)
+train_agent(epsilon, False, True)
