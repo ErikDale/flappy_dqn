@@ -51,7 +51,7 @@ def plotGraph(x, y, title, x_label, y_label):
 epsilon = 1
 
 # Number of episodes to train
-num_episodes = 5000
+num_episodes = 1000
 
 # Makes epsilon go from 1 to 0.1 in num_episodes episodes
 epsilon_decay = 0.9 / num_episodes
@@ -86,7 +86,10 @@ def train_agent(epsilon, actor_critic, cnn):
 
     game = flappyGame(cnn_model=cnn)  # initialization of game
 
+    num = 0
+
     for i in range(num_episodes):
+        num += 1
         score = 0
         state = game.main()  # return initial state
         done = False
@@ -132,12 +135,17 @@ def train_agent(epsilon, actor_critic, cnn):
 
             score += reward
 
+            if len(agent.replay_buffer) > 3000:
+                agent.learn2(target_train=(num == 100))
+                has_learned = True
+                num = 0
+
             if done:
                 if has_learned:
                     # Save the model if the current score is better than the best
                     # overall score
                     if score > best_score and not exploration_bool:
-                        save_agent(agent, "models/cnn_model_long_medium", actor=actor_critic)
+                        save_agent(agent, "models/cnn_model_long_easy", actor=actor_critic)
                         best_score = score  # Update the best score
 
                 # append score to be plotted if it was exploitation
@@ -147,9 +155,9 @@ def train_agent(epsilon, actor_critic, cnn):
                 epsilon -= epsilon_decay
 
                 # start learning when the memory is bigger than 3000
-                if len(agent.replay_buffer) > 3000:
-                    agent.learn()
-                    has_learned = True
+                #if len(agent.replay_buffer) > 3000:
+                 #   agent.learn()
+                  #  has_learned = True
 
                 print(f'episode done: {i + 1}\t score recieved: {score}')
 
@@ -417,7 +425,6 @@ def train_dnnq_agent2(exploration):
     plotGraph(x, scores, "Rewards over episodes", "Episode", "Score")
     # Saving agent's model
     save_agent(agent, "./models/model_agent2", actor=False)'''
-
 
 # train_dnnq_agent2(exploration)
 
