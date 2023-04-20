@@ -1,5 +1,5 @@
 import tensorflow as tf
-from PIL import Image
+from PIL import Image, ImageOps
 import numpy as np
 
 """
@@ -26,16 +26,20 @@ def pre_process_cnn_input(image):
     # Resize the image to 84x84 pixels.
     image = image.resize((84, 84))
 
-    # Convert the image to a NumPy array.
-    image = np.array(image)
+    # Grayscale the image
+    gray_image = image.convert('L')
+
+    # Apply adaptive thresholding
+    thresholded_image = ImageOps.autocontrast(gray_image, cutoff=2).convert('1')
+
+    thresholded_image = np.array(thresholded_image)
+
+    thresholded_image = np.expand_dims(thresholded_image, axis=-1)
 
     # Normalize the image.
-    normalized_image = tf.image.per_image_standardization(image)
+    normalized_image = tf.image.per_image_standardization(thresholded_image)
 
-    # Convert the image to grayscale.
-    gray_image = tf.image.rgb_to_grayscale(normalized_image)
-
-    return gray_image
+    return normalized_image
 
 
 def pre_process_dnn_input(state_reward_struct):
