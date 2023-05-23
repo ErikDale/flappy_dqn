@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 
 models/
+plots/
 
 # C extensions
 *.so
