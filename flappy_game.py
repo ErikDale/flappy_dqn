@@ -3,7 +3,6 @@ import random
 import sys
 import pygame
 from pygame.locals import *
-from PIL import Image
 from pre_processing import pre_process_cnn_input, pre_process_dnn_input
 
 '''
@@ -11,17 +10,10 @@ Heavily inspired by the code found at https://github.com/sourabhv/FlapPyBird
 @date 27.02.2023 
 '''
 
-
-'''
-img = pygame.surfarray.array3d(self.screen)
-image = Image.fromarray(img)
-image.save('./image.png')
-'''
-
 FPS = 30
 SCREENWIDTH = 288
 SCREENHEIGHT = 512
-PIPEGAPSIZE = 200  # gap between upper and lower part of pipe
+PIPEGAPSIZE = 200  # gap between upper and lower part of pipe, decides the difficult of the game
 BASEY = SCREENHEIGHT * 0.79
 # image, sound and hitmask  dicts
 IMAGES, SOUNDS, HITMASKS = {}, {}, {}
@@ -31,18 +23,6 @@ IMAGES, SOUNDS, HITMASKS = {}, {}, {}
 
 # list of all possible players (tuple of 3 positions of flap)
 PLAYERS_LIST = (
-    # red bird
-    #(
-    #    'assets/sprites/redbird-upflap.png',
-    #    'assets/sprites/redbird-midflap.png',
-    #    'assets/sprites/redbird-downflap.png',
-    #),
-    # blue bird
-    #(
-    #    'assets/sprites/bluebird-upflap.png',
-    #    'assets/sprites/bluebird-midflap.png',
-    #    'assets/sprites/bluebird-downflap.png',
-    #),
     # yellow bird
     (
         'assets/sprites/yellowbird-upflap.png',
@@ -54,7 +34,6 @@ PLAYERS_LIST = (
 # list of pipes
 PIPES_LIST = (
     'assets/sprites/pipe-green.png',
-    #'assets/sprites/pipe-red.png',
 )
 
 try:
@@ -303,12 +282,8 @@ class flappyGame:
             pygame.display.update()
             self.fpsClock.tick(FPS)
 
-    def takeStep(self, action):
-        print(action)
-        if self.playery > 125 and self.playery < 325:
-            reward = 0.1
-        else:
-            reward = 0.1
+    def take_step(self, action):
+        reward = 0.1
         # Player presses flap button (space or up key)
         if action == 1:
             if self.playery > -2 * IMAGES['player'][0].get_height():
@@ -423,13 +398,6 @@ class flappyGame:
                 'done': False
             }
 
-    '''def mainGame(self):       
-
-        # Gameloop
-        while True:
-            crash_info = self.takeStep()
-            if crash_info:
-                return crash_info'''
 
     def showGameOverScreen(self, crashInfo):
         """crashes the player down and shows gameover image"""
@@ -590,15 +558,3 @@ class flappyGame:
                 mask[x].append(bool(image.get_at((x, y))[3]))
         return mask
 
-
-'''if __name__ == '__main__':
-    flappyGame = flappyGame()
-    flappyGame.main()
-
-    # crash_info = None
-    while True:
-        crash_info = flappyGame.takeStep()
-        if crash_info:
-            break
-
-    flappyGame.showGameOverScreen(crash_info)'''
