@@ -11,119 +11,6 @@ import math
 """
 
 
-class ActorCriticAgent:
-    """
-    Actor-Critic agent that learns to interact with an environment.
-    :param num_actions: the number of actions available to the agent.
-    :param replay_buffer_size: the maximum size of the replay buffer. Default is 20000.
-    :param batch_size: the size of the minibatch sampled from the replay buffer during training. Default is 32.
-    :param discount_factor: the discount factor for future rewards. Default is 0.95.
-    :param actor_learning_rate: the learning rate for the actor model. Default is 0.0001.
-    :param critic_learning_rate: the learning rate for the critic model. Default is 0.001.
-    """
-    def __init__(self, num_actions, replay_buffer_size=20000, batch_size=32, discount_factor=0.95,
-                 actor_learning_rate=0.0001, critic_learning_rate=0.001):
-        """
-        Initialize the actor critic agent.
-        """
-        self.num_actions = num_actions
-        self.replay_buffer = deque(maxlen=replay_buffer_size)
-        self.batch_size = batch_size
-        self.discount_factor = discount_factor
-        self.gradient_clip_norm = 1
-
-        # Initialize actor-critic model
-        self.actor_model = ActorModel(num_actions)
-        self.critic_model = CriticModel()
-
-        # self.actor_optimizer = tf.keras.optimizers.experimental.RMSprop(learning_rate=actor_learning_rate, momentum=0.95, weight_decay=0.9)
-        self.actor_optimizer = tf.keras.optimizers.Adam(learning_rate=actor_learning_rate)
-        self.critic_optimizer = tf.keras.optimizers.Adam(learning_rate=critic_learning_rate)
-
-    def remember(self, state, action, reward, next_state, done):
-        """
-        Store a new experience tuple in the replay buffer.
-        :param state: the current state of the environment.
-        :param action: the action taken by the agent.
-        :param reward: the reward received by the agent.
-        :param next_state: the next state of the environment.
-        :param done: whether the episode has terminated or not.
-        """
-        self.replay_buffer.append((state, action, reward, next_state, done))
-
-    def choose_action(self, state):
-        """
-        Generate an action using the current policy.
-        :param state: the current state of the environment.
-        :return: the chosen action.
-        """
-        state = np.expand_dims(state, axis=0)
-        actor_output = self.actor_model(state)
-        actor_output = tf.squeeze(actor_output)
-        actor_output = actor_output - tf.reduce_max(actor_output)
-        exp_actor_output = tf.exp(actor_output) + 1e-2  # Add small epsilon value to ensure non-zero values
-        policy = exp_actor_output / tf.reduce_sum(exp_actor_output)
-        if math.isnan(policy[0]) or math.isnan(policy[1]):
-            action = 0
-        else:
-            # action = np.random.choice(self.num_actions, p=policy.numpy())
-            action = tf.argmax(policy)
-        return action
-
-    def learn(self):
-        """
-        Update the actor and critic models using a batch of experiences from the replay buffer.
-        """
-        # Sample minibatch from replay buffer
-        minibatch = np.array(random.sample(self.replay_buffer, self.batch_size), dtype=object)
-
-        # Unpack minibatch
-        states = np.stack(minibatch[:, 0])
-        actions = minibatch[:, 1].astype(int)
-        rewards = minibatch[:, 2]
-        next_states = np.stack(minibatch[:, 3])
-        dones = minibatch[:, 4]
-
-        # Convert inputs to tensors
-        states = tf.convert_to_tensor(states, dtype=tf.float32)
-        actions = tf.convert_to_tensor(actions, dtype=tf.int32)
-        rewards = tf.convert_to_tensor(rewards, dtype=tf.float32)
-        next_states = tf.convert_to_tensor(next_states, dtype=tf.float32)
-        dones = tf.convert_to_tensor(dones, dtype=tf.float32)
-
-        # Compute critic loss
-        with tf.GradientTape() as tape:
-            inputs = (states, actions)
-            values = self.critic_model(inputs)
-
-            inputs = (next_states, actions)
-            next_values = self.critic_model(inputs)
-
-            next_values = np.array(next_values)
-
-            td_targets = rewards + self.discount_factor * next_values * (1 - dones)
-            td_errors = td_targets - values
-            critic_loss = tf.reduce_mean(tf.square(td_errors))
-
-        # Compute critic gradients and apply to optimizer
-        critic_grads = tape.gradient(critic_loss, self.critic_model.trainable_variables)
-        critic_grads, _ = tf.clip_by_global_norm(critic_grads, self.gradient_clip_norm)
-        self.critic_optimizer.apply_gradients(zip(critic_grads, self.critic_model.trainable_variables))
-
-        # Compute actor loss
-        with tf.GradientTape() as tape:
-            policy = self.actor_model(states)
-            actions_one_hot = tf.one_hot(actions, self.num_actions)
-            advantages = tf.stop_gradient(td_errors)
-            actor_loss = -tf.reduce_mean(
-                tf.reduce_sum(actions_one_hot * tf.math.log(policy + 1e-10), axis=1) * advantages)
-
-        # Compute actor gradients and apply to optimizer
-        actor_grads = tape.gradient(actor_loss, self.actor_model.trainable_variables)
-        actor_grads, _ = tf.clip_by_global_norm(actor_grads, self.gradient_clip_norm)
-        self.actor_optimizer.apply_gradients(zip(actor_grads, self.actor_model.trainable_variables))
-
-
 class Agent:
     """
     Agent that learns to interact with an environment.
@@ -143,7 +30,7 @@ class Agent:
         if cnn_model:
             self.target_model = CNNRLModel(n_actions)
             self.behavior_model = CNNRLModel(n_actions)
-            self.model = CNNRLModel2(n_actions)
+            self.model = CNNRLModel(n_actions)
         else:
             self.model = DNNModel(n_actions)
 
@@ -153,14 +40,14 @@ class Agent:
         self.gradient_clip_norm = 3
         self.batch_size = batch_size
 
-    def choose_action(self, state):
+    def choose_action(self, state, model):
         """
         Generate an action using the current policy.
         :param state: the current state of the environment.
         :return: the chosen action.
         """
-        # state = np.expand_dims(state, axis=0)
-        actor_output = self.model(state)
+        state = np.expand_dims(state, axis=0)
+        actor_output = model(state)
         actor_output = tf.squeeze(actor_output)
         actor_output = actor_output - tf.reduce_max(actor_output)
         exp_actor_output = tf.exp(actor_output) + 1e-2  # Add small epsilon value to ensure non-zero
@@ -271,3 +158,84 @@ class Agent:
         gradients = tape.gradient(loss, self.model.trainable_variables)
         gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clip_norm)
         self.opt.apply_gradients(zip(gradients, self.model.trainable_variables))
+
+
+class ActorCriticAgent(Agent):
+    """
+    Actor-Critic agent that learns to interact with an environment. Inherits from the Agent class
+    :param gamma: the discount factor for future rewards. Default is 0.95.
+    :param n_actions: the number of actions available to the agent. Default is 2.
+    :param replay_buffer_size: the maximum size of the replay buffer. Default is 20000.
+    :param batch_size: the size of the minibatch sampled from the replay buffer during training. Default is 32.
+    :param actor_learning_rate: the learning rate for the actor model. Default is 0.0001.
+    :param critic_learning_rate: the learning rate for the critic model. Default is 0.001.
+    """
+    def __init__(self, gamma=0.95, n_actions=2, replay_buffer_size=20000, batch_size=32,
+                 actor_learning_rate=0.0001, critic_learning_rate=0.001):
+        """
+        Initialize the actor critic agent.
+        """
+        super().__init__(gamma, n_actions=n_actions, replay_buffer_size=replay_buffer_size, batch_size=batch_size)
+        self.batch_size = batch_size
+        self.gradient_clip_norm = 1
+
+        # Initialize actor-critic model
+        self.actor_model = ActorModel(n_actions)
+        self.critic_model = CriticModel()
+
+        # self.actor_optimizer = tf.keras.optimizers.experimental.RMSprop(learning_rate=actor_learning_rate, momentum=0.95, weight_decay=0.9)
+        self.actor_optimizer = tf.keras.optimizers.Adam(learning_rate=actor_learning_rate)
+        self.critic_optimizer = tf.keras.optimizers.Adam(learning_rate=critic_learning_rate)
+
+    def learn(self):
+        """
+        Update the actor and critic models using a batch of experiences from the replay buffer.
+        """
+        # Sample minibatch from replay buffer
+        minibatch = np.array(random.sample(self.replay_buffer, self.batch_size), dtype=object)
+
+        # Unpack minibatch
+        states = np.stack(minibatch[:, 0])
+        actions = minibatch[:, 1].astype(int)
+        rewards = minibatch[:, 2]
+        next_states = np.stack(minibatch[:, 3])
+        dones = minibatch[:, 4]
+
+        # Convert inputs to tensors
+        states = tf.convert_to_tensor(states, dtype=tf.float32)
+        actions = tf.convert_to_tensor(actions, dtype=tf.int32)
+        rewards = tf.convert_to_tensor(rewards, dtype=tf.float32)
+        next_states = tf.convert_to_tensor(next_states, dtype=tf.float32)
+        dones = tf.convert_to_tensor(dones, dtype=tf.float32)
+
+        # Compute critic loss
+        with tf.GradientTape() as tape:
+            inputs = (states, actions)
+            values = self.critic_model(inputs)
+
+            inputs = (next_states, actions)
+            next_values = self.critic_model(inputs)
+
+            next_values = np.array(next_values)
+
+            td_targets = rewards + self.gamma * next_values * (1 - dones)
+            td_errors = td_targets - values
+            critic_loss = tf.reduce_mean(tf.square(td_errors))
+
+        # Compute critic gradients and apply to optimizer
+        critic_grads = tape.gradient(critic_loss, self.critic_model.trainable_variables)
+        critic_grads, _ = tf.clip_by_global_norm(critic_grads, self.gradient_clip_norm)
+        self.critic_optimizer.apply_gradients(zip(critic_grads, self.critic_model.trainable_variables))
+
+        # Compute actor loss
+        with tf.GradientTape() as tape:
+            policy = self.actor_model(states)
+            actions_one_hot = tf.one_hot(actions, self.n_actions)
+            advantages = tf.stop_gradient(td_errors)
+            actor_loss = -tf.reduce_mean(
+                tf.reduce_sum(actions_one_hot * tf.math.log(policy + 1e-10), axis=1) * advantages)
+
+        # Compute actor gradients and apply to optimizer
+        actor_grads = tape.gradient(actor_loss, self.actor_model.trainable_variables)
+        actor_grads, _ = tf.clip_by_global_norm(actor_grads, self.gradient_clip_norm)
+        self.actor_optimizer.apply_gradients(zip(actor_grads, self.actor_model.trainable_variables))
