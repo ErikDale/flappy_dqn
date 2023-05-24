@@ -46,17 +46,19 @@ class Agent:
         :param state: the current state of the environment.
         :return: the chosen action.
         """
-        state = np.expand_dims(state, axis=0)
-        actor_output = model(state)
-        actor_output = tf.squeeze(actor_output)
-        actor_output = actor_output - tf.reduce_max(actor_output)
-        exp_actor_output = tf.exp(actor_output) + 1e-2  # Add small epsilon value to ensure non-zero
-        policy = exp_actor_output / tf.reduce_sum(exp_actor_output)
+        state = np.expand_dims(state, axis=0)  # Add batch dimension
+        actor_output = model(state)  # Compute the output of the model
+        actor_output = tf.squeeze(actor_output)  # Remove the batch dimension
+        actor_output = actor_output - tf.reduce_max(actor_output)  # Subtract the maximum value for numerical stability
+        exp_actor_output = tf.exp(actor_output) + 1e-2  # Exponentiate and add a small epsilon value for non-zero
+        # probabilities
+        policy = exp_actor_output / tf.reduce_sum(exp_actor_output)  # Compute the policy by normalizing the
+        # probabilities
         if math.isnan(policy[0]) or math.isnan(policy[1]):
-            action = 0
+            action = 0  # If policy contains NaN values, choose default action (0)
         else:
             # action = np.random.choice(self.n_actions, p=policy.numpy())
-            action = tf.argmax(policy)
+            action = tf.argmax(policy)  # Choose the action with the highest probability
         return action
 
     def remember(self, state, action, reward, next_state, done):
@@ -139,25 +141,29 @@ class Agent:
         dones = tf.convert_to_tensor(dones, dtype=tf.float32)
 
         # Compute target values
-        target_actions = self.model(next_states)
-        target_actions = tf.squeeze(target_actions)  # remove dimensions of size 1
-        target_actions = tf.reduce_max(target_actions, axis=1)
-        target_values = rewards + self.gamma * target_actions * (1 - dones)
+        target_actions = self.model(next_states)  # Compute the output of the model for the next states
+        target_actions = tf.squeeze(target_actions)  # Remove dimensions of size 1
+        target_actions = tf.reduce_max(target_actions, axis=1)  # Compute the maximum action value for each sample
+        target_values = rewards + self.gamma * target_actions * (1 - dones)  # Compute the target values
 
         # Compute loss and update weights
         with tf.GradientTape() as tape:
             # Forward pass
-            predicted_actions = self.model(states)
-            predicted_actions = tf.squeeze(predicted_actions)
-            predicted_values = tf.reduce_sum(predicted_actions * actions, axis=1)
+            predicted_actions = self.model(states)  # Compute the output of the model for the current states
+            predicted_actions = tf.squeeze(predicted_actions)  # Remove dimensions of size 1
+            predicted_values = tf.reduce_sum(predicted_actions * actions, axis=1)  # Compute the predicted values
 
             # Compute loss
-            loss = tf.keras.losses.mean_squared_error(target_values, predicted_values)
+            loss = tf.keras.losses.mean_squared_error(target_values, predicted_values)  # Compute the mean squared
+            # error loss
 
         # Compute gradients and update weights
-        gradients = tape.gradient(loss, self.model.trainable_variables)
-        gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clip_norm)
-        self.opt.apply_gradients(zip(gradients, self.model.trainable_variables))
+        gradients = tape.gradient(loss, self.model.trainable_variables)  # Compute the gradients of the loss with
+        # respect to the model's trainable variables
+        gradients, _ = tf.clip_by_global_norm(gradients, self.gradient_clip_norm)  # Clip the gradients to prevent
+        # gradient explosion
+        self.opt.apply_gradients(zip(gradients, self.model.trainable_variables))  # Apply the gradients to update the
+        # model's weights
 
 
 class ActorCriticAgent(Agent):
@@ -211,31 +217,39 @@ class ActorCriticAgent(Agent):
         # Compute critic loss
         with tf.GradientTape() as tape:
             inputs = (states, actions)
-            values = self.critic_model(inputs)
+            values = self.critic_model(inputs)  # Compute the critic values for the current states and actions
 
             inputs = (next_states, actions)
-            next_values = self.critic_model(inputs)
+            next_values = self.critic_model(inputs)  # Compute the critic values for the next states and actions
 
-            next_values = np.array(next_values)
+            next_values = np.array(next_values)  # Convert the next values to a numpy array
 
-            td_targets = rewards + self.gamma * next_values * (1 - dones)
-            td_errors = td_targets - values
-            critic_loss = tf.reduce_mean(tf.square(td_errors))
+            td_targets = rewards + self.gamma * next_values * (1 - dones)  # Compute the TD targets
+            td_errors = td_targets - values  # Compute the TD errors
+            critic_loss = tf.reduce_mean(tf.square(td_errors))  # Compute the mean squared TD error loss
 
         # Compute critic gradients and apply to optimizer
-        critic_grads = tape.gradient(critic_loss, self.critic_model.trainable_variables)
-        critic_grads, _ = tf.clip_by_global_norm(critic_grads, self.gradient_clip_norm)
-        self.critic_optimizer.apply_gradients(zip(critic_grads, self.critic_model.trainable_variables))
+        critic_grads = tape.gradient(critic_loss, self.critic_model.trainable_variables)  # Compute the gradients of
+        # the critic loss with respect to the critic model's trainable variables
+        critic_grads, _ = tf.clip_by_global_norm(critic_grads, self.gradient_clip_norm)  # Clip the gradients to
+        # prevent gradient explosion
+        self.critic_optimizer.apply_gradients(zip(critic_grads, self.critic_model.trainable_variables))  # Apply the
+        # gradients to update the critic model's weights
 
         # Compute actor loss
         with tf.GradientTape() as tape:
-            policy = self.actor_model(states)
-            actions_one_hot = tf.one_hot(actions, self.n_actions)
-            advantages = tf.stop_gradient(td_errors)
+            policy = self.actor_model(states)  # Compute the actor policy for the current states
+            actions_one_hot = tf.one_hot(actions, self.n_actions)  # Convert the actions to one-hot encoding
+            advantages = tf.stop_gradient(
+                td_errors)  # Compute the advantages by stopping the gradient flow of TD errors
             actor_loss = -tf.reduce_mean(
-                tf.reduce_sum(actions_one_hot * tf.math.log(policy + 1e-10), axis=1) * advantages)
+                tf.reduce_sum(actions_one_hot * tf.math.log(policy + 1e-10), axis=1) * advantages
+            )  # Compute the actor loss using the policy and advantages
 
         # Compute actor gradients and apply to optimizer
-        actor_grads = tape.gradient(actor_loss, self.actor_model.trainable_variables)
-        actor_grads, _ = tf.clip_by_global_norm(actor_grads, self.gradient_clip_norm)
-        self.actor_optimizer.apply_gradients(zip(actor_grads, self.actor_model.trainable_variables))
+        actor_grads = tape.gradient(actor_loss, self.actor_model.trainable_variables)  # Compute the gradients of the
+        # actor loss with respect to the actor model's trainable variables
+        actor_grads, _ = tf.clip_by_global_norm(actor_grads, self.gradient_clip_norm)  # Clip the gradients to
+        # prevent gradient explosion
+        self.actor_optimizer.apply_gradients(zip(actor_grads, self.actor_model.trainable_variables))  # Apply the
+        # gradients to update the actor model's weights
