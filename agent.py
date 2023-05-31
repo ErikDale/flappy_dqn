@@ -1,4 +1,4 @@
-from models import DNNModel, CNNRLModel, CriticModel, ActorModel, CNNRLModel2
+from models import DNNModel, CNNRLModel, CriticModel, ActorModel
 import tensorflow as tf
 import numpy as np
 from collections import deque
@@ -71,53 +71,6 @@ class Agent:
         :param done: whether the episode has terminated or not.
         """
         self.replay_buffer.append((state, action, reward, next_state, done))
-
-    def learn2(self, target_train):
-        # Find a batch size that is 10% of the whole replay buffer.
-        # self.batch_size = int(len(self.replay_buffer) * 0.1)
-
-        # Sample minibatch from replay buffer
-        minibatch = np.array(random.sample(self.replay_buffer, self.batch_size), dtype=object)
-
-        # Unpack minibatch
-        states = np.stack(minibatch[:, 0])
-        actions = minibatch[:, 1].astype(int)
-        rewards = minibatch[:, 2]
-        next_states = np.stack(minibatch[:, 3])
-        dones = minibatch[:, 4]
-
-        # Convert inputs to tensors
-        states = tf.convert_to_tensor(states, dtype=tf.float32)
-        actions = tf.convert_to_tensor(actions, dtype=tf.int32)
-        rewards = tf.convert_to_tensor(rewards, dtype=tf.float32)
-        next_states = tf.convert_to_tensor(next_states, dtype=tf.float32)
-        dones = tf.convert_to_tensor(dones, dtype=tf.float32)
-
-        # Compute target Q values using the target network
-        target_actions = self.target_model(next_states)
-        target_actions = tf.squeeze(target_actions)
-        target_values = tf.reduce_max(target_actions, axis=1)
-        target_values = (1 - dones) * self.gamma * target_values + rewards
-
-        # Compute loss and update weights
-        with tf.GradientTape() as tape:
-            # Forward pass
-            predicted_actions = self.behavior_model(states)
-            predicted_actions = tf.squeeze(predicted_actions)
-            predicted_values = tf.reduce_sum(predicted_actions * tf.one_hot(actions, self.n_actions), axis=1)
-
-            # Compute loss
-            loss = tf.keras.losses.mean_squared_error(target_values, predicted_values)
-
-        # Compute gradients and apply to optimizer
-        grads = tape.gradient(loss, self.behavior_model.trainable_variables)
-        grads, _ = tf.clip_by_global_norm(grads, self.gradient_clip_norm)
-        self.opt.apply_gradients(zip(grads, self.behavior_model.trainable_variables))
-
-        if target_train:
-            # Update the target network with the behavior network's weights
-            for target, behavior in zip(self.target_model.trainable_variables, self.behavior_model.trainable_variables):
-                target.assign(behavior)
 
     def learn(self):
         """

@@ -43,48 +43,6 @@ class CNNRLModel(keras.Model):
         return x
 
 
-class CNNRLModel2(keras.Model):
-    """
-    Convolutional Neural Network model.
-    :param num_actions: number of actions to output
-    """
-
-    def __init__(self, num_actions):
-        super().__init__()
-        initializer = tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.1, seed=42)
-        self.cnn1 = tf.keras.layers.Conv2D(32, kernel_size=8, strides=4, activation='relu', input_shape=(84, 84, 4), kernel_initializer=initializer)
-        self.cnn2 = tf.keras.layers.Conv2D(64, kernel_size=4, strides=2, activation='relu', kernel_initializer=initializer)
-        self.cnn3 = tf.keras.layers.Conv2D(64, kernel_size=3, strides=1, activation='relu', kernel_initializer=initializer)
-        self.flat1 = tf.keras.layers.Flatten()
-        self.dense1 = tf.keras.layers.Dense(512, activation='relu')
-        self.action = tf.keras.layers.Dense(num_actions, activation='softmax')
-
-    def call(self, state, training=True):
-        """
-        Perform forward pass on the model with given state input.
-        :param state: input state
-        :return: probabilities of each action
-        """
-        state = tf.convert_to_tensor(state)
-        if len(state.shape) < 4:
-            state = tf.expand_dims(state, 0)
-        x = tf.cast(state, tf.float32)
-        x = self.cnn1(x)
-        x = self.cnn2(x)
-        x = self.cnn3(x)
-        x = self.flat1(x)
-        x = tf.reshape(x, (-1, 12544))
-
-        x = self.dense1(x)
-        x = self.action(x)
-
-        if len(state.shape) == 4:
-            x = tf.reduce_mean(x, axis=0, keepdims=True)
-
-        return x
-
-
-
 class DNNModel(keras.Model):
     """
     Deep neural network (DNN) model for a reinforcement learning agent.
