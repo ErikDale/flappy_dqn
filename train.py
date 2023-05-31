@@ -51,7 +51,7 @@ def plotGraph(x, y, title, x_label, y_label):
 epsilon = 1
 
 # Number of episodes to train
-num_episodes = 500
+num_episodes = 1000
 
 # Makes epsilon go from 1 to 0.1 in num_episodes episodes
 epsilon_decay = 0.9 / num_episodes
@@ -80,7 +80,7 @@ def train_agent(epsilon, actor_critic, cnn):
     has_learned = False  # tells if the training has started or not
     scores = []  # list of scores for plotting
     if actor_critic:
-        agent = ActorCriticAgent(num_actions=2)  # initialization of actor critic agent
+        agent = ActorCriticAgent(n_actions=2)  # initialization of actor critic agent
     else:
         agent = Agent(n_actions=2, cnn_model=cnn)  # initialization of cnn agent
 
@@ -102,7 +102,10 @@ def train_agent(epsilon, actor_critic, cnn):
         while not done:
             num += 1
             if not exploration_bool:
-                action = agent.choose_action(state)
+                if actor_critic:
+                    action = agent.choose_action(state, agent.actor_model)
+                else:
+                    action = agent.choose_action(state, agent.model)
                 print("Exploitation")
             else:
                 action = random_output()
@@ -135,17 +138,12 @@ def train_agent(epsilon, actor_critic, cnn):
 
             score += reward
 
-            '''if len(agent.replay_buffer) > 3000:
-                agent.learn2(target_train=(num == 100))
-                has_learned = True
-                num = 0'''
-
             if done:
                 if has_learned:
                     # Save the model if the current score is better than the best
                     # overall score
                     if score > best_score and not exploration_bool:
-                        save_agent(agent, "models/dnn_medium", actor=actor_critic)
+                        save_agent(agent, "models/test", actor=actor_critic)
                         best_score = score  # Update the best score
 
                 # append score to be plotted if it was exploitation
@@ -177,7 +175,7 @@ def train_agent_test(epsilon, actor_critic, cnn):
     has_learned = False  # tells if the training has started or not
     scores = []  # list of scores for plotting
     if actor_critic:
-        agent = ActorCriticAgent(num_actions=2)  # initialization of actor critic agent
+        agent = ActorCriticAgent(n_actions=2)  # initialization of actor critic agent
     else:
         agent = Agent(n_actions=2, cnn_model=cnn)  # initialization of cnn agent
 
@@ -283,5 +281,5 @@ def train_agent_test(epsilon, actor_critic, cnn):
     plotGraph(x, scores, "Rewards over episodes", "Episode", "Score")
     print(best_score)
 
-train_agent_test(epsilon, actor_critic=False, cnn=True)
-# train_agent(epsilon, False, False)
+
+train_agent(epsilon, False, False)

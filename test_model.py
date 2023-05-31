@@ -34,12 +34,12 @@ def test_agent(actor_critic, cnn):
     """
     # Initialize the agent
     if actor_critic:
-        agent = ActorCriticAgent(num_actions=2)
+        agent = ActorCriticAgent(n_actions=2)
     else:
         agent = Agent(cnn_model=cnn)
 
     # Load the saved model parameters
-    agent = load_agent(agent, "models/dnn_model_long_medium", actor=actor_critic)
+    agent = load_agent(agent, "models/dnn_model_long_easy", actor=actor_critic)
 
     # Initialize the Flappy Bird game environment
     flappyGameObj = flappyGame(cnn_model=cnn)
@@ -51,10 +51,13 @@ def test_agent(actor_critic, cnn):
     done = False
     while not done:
         # Get the action from the agent
-        action = agent.choose_action(state)
+        if actor_critic:
+            action = agent.choose_action(state, agent.actor_model)
+        else:
+            action = agent.choose_action(state, agent.model)
 
         # Take a step in the environment
-        state_reward_struct = flappyGameObj.takeStep(action)
+        state_reward_struct = flappyGameObj.take_step(action)
 
         # Pre-process the next state
         if cnn:
